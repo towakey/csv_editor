@@ -130,7 +130,7 @@ def main():
             return
 
         csv_file_path = conf.get("csv_file_path", "")
-        write_enc     = normalize_encoding(conf.get("write_encoding", "utf-8-sig"))
+        write_enc     = normalize_encoding(conf.get("write_encoding", "utf-8"))
         newline       = normalize_newline(conf.get("newline", "\r\n"))
         create_backup = conf.get("create_backup", True)
 

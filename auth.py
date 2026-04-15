@@ -109,8 +109,8 @@ def main():
             allowed_files.append({
                 "id":             f["id"],
                 "name":           f.get("name", f["id"]),
-                "read_encoding":  f.get("read_encoding",  "utf-8-sig"),
-                "write_encoding": f.get("write_encoding", "utf-8-sig"),
+                "read_encoding":  f.get("read_encoding",  "utf-8"),
+                "write_encoding": f.get("write_encoding", "utf-8"),
                 "newline":        f.get("newline", "\r\n"),
             })
 

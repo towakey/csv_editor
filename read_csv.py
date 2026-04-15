@@ -108,7 +108,7 @@ def main():
         return
 
     csv_file_path = conf.get("csv_file_path", "")
-    read_enc      = normalize_encoding(conf.get("read_encoding", "utf-8-sig"))
+    read_enc      = normalize_encoding(conf.get("read_encoding", "utf-8"))
 
     if not os.path.exists(csv_file_path):
         sys.stdout.write(json.dumps({"success": False,
