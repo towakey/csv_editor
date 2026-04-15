@@ -1,0 +1,149 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+read_csv.py - CSVファイル読み込みCGI
+GETパラメータ: ?file_id=order&username=admin
+"""
+
+import json
+import csv
+import os
+import sys
+import hashlib
+from datetime import datetime
+
+SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
+SETTING_PATH = os.path.join(SCRIPT_DIR, "setting.json")
+LOG_PATH     = os.path.join(SCRIPT_DIR, "log.csv")
+
+ENCODING_MAP = {
+    "utf-8":       "utf-8",
+    "utf-8-sig":   "utf-8-sig",
+    "utf-8-bom":   "utf-8-sig",
+    "shift-jis":   "shift_jis",
+    "shift_jis":   "shift_jis",
+    "sjis":        "shift_jis",
+    "cp932":       "cp932",
+    "windows-31j": "cp932",
+    "euc-jp":      "euc_jp",
+    "euc_jp":      "euc_jp",
+}
+
+def normalize_encoding(enc):
+    return ENCODING_MAP.get(enc.lower().replace(" ", ""), enc)
+
+def write_log(username, action, detail=""):
+    timestamp  = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    file_exists = os.path.exists(LOG_PATH)
+    try:
+        with open(LOG_PATH, mode="a", encoding="utf-8-sig", newline="") as f:
+            writer = csv.writer(f, lineterminator="\r\n")
+            if not file_exists:
+                writer.writerow(["日時", "ユーザー名", "操作", "詳細"])
+            writer.writerow([timestamp, username, action, detail])
+    except Exception:
+        pass
+
+def main():
+    sys.stdout.write("Content-Type: application/json; charset=utf-8\r\n")
+    sys.stdout.write("Access-Control-Allow-Origin: *\r\n")
+    sys.stdout.write("\r\n")
+    sys.stdout.flush()
+
+    # setting.json 読み込み
+    try:
+        with open(SETTING_PATH, mode="r", encoding="utf-8") as f:
+            setting = json.load(f)
+    except Exception as e:
+        print(json.dumps({"success": False,
+                          "error": "setting.json 読み込み失敗: " + str(e)},
+                         ensure_ascii=False))
+        return
+
+    files = setting.get("files", [])
+    users = setting.get("users", [])
+
+    # GETパラメータ解析
+    qs       = os.environ.get("QUERY_STRING", "")
+    params   = {}
+    for p in qs.split("&"):
+        if "=" in p:
+            k, v = p.split("=", 1)
+            params[k] = v
+
+    file_id  = params.get("file_id", "")
+    username = params.get("username", "")
+
+    if not file_id or not username:
+        sys.stdout.write(json.dumps({"success": False,
+                          "error": "file_id と username は必須です"},
+                         ensure_ascii=False))
+    sys.stdout.flush()
+        return
+
+    # ユーザーの許可チェック
+    matched_user = next((u for u in users if u.get("username") == username), None)
+    if matched_user is None:
+        sys.stdout.write(json.dumps({"success": False, "error": "ユーザーが存在しません"},
+                         ensure_ascii=False))
+    sys.stdout.flush()
+        return
+
+    allowed_ids = set(matched_user.get("allowed_file_ids", []))
+    if file_id not in allowed_ids:
+        write_log(username, "アクセス拒否", "file_id=" + file_id)
+        sys.stdout.write(json.dumps({"success": False,
+                          "error": "このファイルへのアクセス権がありません"},
+                         ensure_ascii=False))
+    sys.stdout.flush()
+        return
+
+    # ファイル設定取得
+    conf = next((f for f in files if f.get("id") == file_id), None)
+    if conf is None:
+        sys.stdout.write(json.dumps({"success": False,
+                          "error": "file_id が見つかりません: " + file_id},
+                         ensure_ascii=False))
+    sys.stdout.flush()
+        return
+
+    csv_file_path = conf.get("csv_file_path", "")
+    read_enc      = normalize_encoding(conf.get("read_encoding", "utf-8-sig"))
+
+    if not os.path.exists(csv_file_path):
+        sys.stdout.write(json.dumps({"success": False,
+                          "error": "ファイルが見つかりません: " + csv_file_path},
+                         ensure_ascii=False))
+    sys.stdout.flush()
+        return
+
+    try:
+        rows    = []
+        headers = []
+        with open(csv_file_path, mode="r", encoding=read_enc, newline="") as f:
+            reader = csv.reader(f)
+            for i, row in enumerate(reader):
+                if i == 0:
+                    headers = row
+                else:
+                    rows.append(row)
+
+        write_log(username, "ファイルを開く",
+                  "id={} name={} rows={}".format(file_id, conf.get("name",""), len(rows)))
+
+        result = {
+            "success":          True,
+            "headers":          headers,
+            "rows":             rows,
+            "total_rows":       len(rows),
+            "conf_name":        conf.get("name", ""),
+            "editable_columns": conf.get("editable_columns", []),
+        }
+        sys.stdout.write(json.dumps(result, ensure_ascii=False))
+    sys.stdout.flush()
+
+    except Exception as e:
+        print(json.dumps({"success": False, "error": str(e)}, ensure_ascii=False))
+
+if __name__ == "__main__":
+    main()

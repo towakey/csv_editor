@@ -1,0 +1,38 @@
+{
+  "files": [
+    {
+      "id": "order",
+      "name": "受注データ",
+      "csv_file_path": "D:\\APP\\order.csv",
+      "read_encoding": "utf-8-sig",
+      "write_encoding": "utf-8-sig",
+      "newline": "\r\n",
+      "editable_columns": ["備考", "担当者", "ステータス"],
+      "create_backup": true
+    },
+    {
+      "id": "stock",
+      "name": "在庫データ",
+      "csv_file_path": "D:\\APP\\stock.csv",
+      "read_encoding": "shift-jis",
+      "write_encoding": "shift-jis",
+      "newline": "\r\n",
+      "editable_columns": ["数量", "備考"],
+      "create_backup": true
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "display_name": "管理者",
+      "password": "password123",
+      "allowed_file_ids": ["order", "stock"]
+    },
+    {
+      "username": "user1",
+      "display_name": "ユーザー1",
+      "password": "pass456",
+      "allowed_file_ids": ["order"]
+    }
+  ]
+}
