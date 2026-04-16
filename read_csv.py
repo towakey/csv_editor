@@ -55,9 +55,11 @@ def main():
         with open(SETTING_PATH, mode="r", encoding="utf-8") as f:
             setting = json.load(f)
     except Exception as e:
-        print(json.dumps({"success": False,
+        sys.stdout.write(json.dumps({"success": False,
                           "error": "setting.json 読み込み失敗: " + str(e)},
                          ensure_ascii=False))
+        sys.stdout.write("\r\n")
+        sys.stdout.flush()
         return
 
     files = setting.get("files", [])
@@ -78,7 +80,8 @@ def main():
         sys.stdout.write(json.dumps({"success": False,
                           "error": "file_id と username は必須です"},
                          ensure_ascii=False))
-    sys.stdout.flush()
+        sys.stdout.write("\r\n")
+        sys.stdout.flush()
         return
 
     # ユーザーの許可チェック
@@ -86,7 +89,8 @@ def main():
     if matched_user is None:
         sys.stdout.write(json.dumps({"success": False, "error": "ユーザーが存在しません"},
                          ensure_ascii=False))
-    sys.stdout.flush()
+        sys.stdout.write("\r\n")
+        sys.stdout.flush()
         return
 
     allowed_ids = set(matched_user.get("allowed_file_ids", []))
@@ -95,7 +99,8 @@ def main():
         sys.stdout.write(json.dumps({"success": False,
                           "error": "このファイルへのアクセス権がありません"},
                          ensure_ascii=False))
-    sys.stdout.flush()
+        sys.stdout.write("\r\n")
+        sys.stdout.flush()
         return
 
     # ファイル設定取得
@@ -104,7 +109,8 @@ def main():
         sys.stdout.write(json.dumps({"success": False,
                           "error": "file_id が見つかりません: " + file_id},
                          ensure_ascii=False))
-    sys.stdout.flush()
+        sys.stdout.write("\r\n")
+        sys.stdout.flush()
         return
 
     csv_file_path = conf.get("csv_file_path", "")
@@ -114,7 +120,8 @@ def main():
         sys.stdout.write(json.dumps({"success": False,
                           "error": "ファイルが見つかりません: " + csv_file_path},
                          ensure_ascii=False))
-    sys.stdout.flush()
+        sys.stdout.write("\r\n")
+        sys.stdout.flush()
         return
 
     try:
@@ -140,10 +147,13 @@ def main():
             "editable_columns": conf.get("editable_columns", []),
         }
         sys.stdout.write(json.dumps(result, ensure_ascii=False))
-    sys.stdout.flush()
+        sys.stdout.write("\r\n")
+        sys.stdout.flush()
 
     except Exception as e:
-        print(json.dumps({"success": False, "error": str(e)}, ensure_ascii=False))
+        sys.stdout.write(json.dumps({"success": False, "error": str(e)}, ensure_ascii=False))
+        sys.stdout.write("\r\n")
+        sys.stdout.flush()
 
 if __name__ == "__main__":
     main()

@@ -61,11 +61,13 @@ def main():
     method = os.environ.get("REQUEST_METHOD", "GET").upper()
     if method == "OPTIONS":
         sys.stdout.write(json.dumps({"success": True}))
-    sys.stdout.flush()
+        sys.stdout.write("\r\n")
+        sys.stdout.flush()
         return
     if method != "POST":
         sys.stdout.write(json.dumps({"success": False, "error": "POST のみ受け付けます"}))
-    sys.stdout.flush()
+        sys.stdout.write("\r\n")
+        sys.stdout.flush()
         return
 
     # setting.json 読み込み
@@ -73,9 +75,11 @@ def main():
         with open(SETTING_PATH, mode="r", encoding="utf-8") as f:
             setting = json.load(f)
     except Exception as e:
-        print(json.dumps({"success": False,
+        sys.stdout.write(json.dumps({"success": False,
                           "error": "setting.json 読み込み失敗: " + str(e)},
                          ensure_ascii=False))
+        sys.stdout.write("\r\n")
+        sys.stdout.flush()
         return
 
     files = setting.get("files", [])
@@ -85,7 +89,8 @@ def main():
         content_length = int(os.environ.get("CONTENT_LENGTH", 0))
         if content_length <= 0:
             sys.stdout.write(json.dumps({"success": False, "error": "データが空です"}))
-    sys.stdout.flush()
+            sys.stdout.write("\r\n")
+            sys.stdout.flush()
             return
 
         body    = sys.stdin.buffer.read(content_length)
@@ -100,7 +105,8 @@ def main():
             sys.stdout.write(json.dumps({"success": False,
                               "error": "file_id と username は必須です"},
                              ensure_ascii=False))
-    sys.stdout.flush()
+            sys.stdout.write("\r\n")
+            sys.stdout.flush()
             return
 
         # ユーザーの許可チェック
@@ -108,7 +114,8 @@ def main():
         if matched_user is None:
             sys.stdout.write(json.dumps({"success": False, "error": "ユーザーが存在しません"},
                              ensure_ascii=False))
-    sys.stdout.flush()
+            sys.stdout.write("\r\n")
+            sys.stdout.flush()
             return
 
         allowed_ids = set(matched_user.get("allowed_file_ids", []))
@@ -117,7 +124,8 @@ def main():
             sys.stdout.write(json.dumps({"success": False,
                               "error": "このファイルへの書き込み権限がありません"},
                              ensure_ascii=False))
-    sys.stdout.flush()
+            sys.stdout.write("\r\n")
+            sys.stdout.flush()
             return
 
         # ファイル設定取得
@@ -126,7 +134,8 @@ def main():
             sys.stdout.write(json.dumps({"success": False,
                               "error": "file_id が見つかりません: " + file_id},
                              ensure_ascii=False))
-    sys.stdout.flush()
+            sys.stdout.write("\r\n")
+            sys.stdout.flush()
             return
 
         csv_file_path = conf.get("csv_file_path", "")
@@ -136,7 +145,8 @@ def main():
 
         if not headers:
             sys.stdout.write(json.dumps({"success": False, "error": "ヘッダーがありません"}))
-    sys.stdout.flush()
+            sys.stdout.write("\r\n")
+            sys.stdout.flush()
             return
 
         # バックアップ
@@ -155,17 +165,23 @@ def main():
         write_log(username, "ファイルを保存",
                   "id={} name={} rows={}".format(file_id, conf.get("name",""), len(rows)))
 
-        print(json.dumps({
+        sys.stdout.write(json.dumps({
             "success":    True,
             "message":    "保存しました ({} 行)".format(len(rows)),
             "saved_rows": len(rows),
         }, ensure_ascii=False))
+        sys.stdout.write("\r\n")
+        sys.stdout.flush()
 
     except json.JSONDecodeError as e:
-        print(json.dumps({"success": False, "error": "JSONパースエラー: " + str(e)},
+        sys.stdout.write(json.dumps({"success": False, "error": "JSONパースエラー: " + str(e)},
                          ensure_ascii=False))
+        sys.stdout.write("\r\n")
+        sys.stdout.flush()
     except Exception as e:
-        print(json.dumps({"success": False, "error": str(e)}, ensure_ascii=False))
+        sys.stdout.write(json.dumps({"success": False, "error": str(e)}, ensure_ascii=False))
+        sys.stdout.write("\r\n")
+        sys.stdout.flush()
 
 if __name__ == "__main__":
     main()
