@@ -29,6 +29,17 @@ ENCODING_MAP = {
     "euc_jp":      "euc_jp",
 }
 
+def send_headers():
+    sys.stdout.write("Content-Type: application/json; charset=utf-8\r\n")
+    sys.stdout.write("Access-Control-Allow-Origin: *\r\n")
+    sys.stdout.write("\r\n")
+    sys.stdout.flush()
+
+def send_json(obj):
+    body = json.dumps(obj, ensure_ascii=False) + "\r\n"
+    sys.stdout.buffer.write(body.encode("utf-8"))
+    sys.stdout.flush()
+
 def normalize_encoding(enc):
     return ENCODING_MAP.get(enc.lower().replace(" ", ""), enc)
 
@@ -45,21 +56,14 @@ def write_log(username, action, detail=""):
         pass
 
 def main():
-    sys.stdout.write("Content-Type: application/json; charset=utf-8\r\n")
-    sys.stdout.write("Access-Control-Allow-Origin: *\r\n")
-    sys.stdout.write("\r\n")
-    sys.stdout.flush()
+    send_headers()
 
     # setting.json 読み込み
     try:
         with open(SETTING_PATH, mode="r", encoding="utf-8") as f:
             setting = json.load(f)
     except Exception as e:
-        sys.stdout.write(json.dumps({"success": False,
-                          "error": "setting.json 読み込み失敗: " + str(e)},
-                         ensure_ascii=False))
-        sys.stdout.write("\r\n")
-        sys.stdout.flush()
+        send_json({"success": False, "error": "setting.json 読み込み失敗: " + str(e)})
         return
 
     files = setting.get("files", [])
@@ -77,51 +81,32 @@ def main():
     username = params.get("username", "")
 
     if not file_id or not username:
-        sys.stdout.write(json.dumps({"success": False,
-                          "error": "file_id と username は必須です"},
-                         ensure_ascii=False))
-        sys.stdout.write("\r\n")
-        sys.stdout.flush()
+        send_json({"success": False, "error": "file_id と username は必須です"})
         return
 
     # ユーザーの許可チェック
     matched_user = next((u for u in users if u.get("username") == username), None)
     if matched_user is None:
-        sys.stdout.write(json.dumps({"success": False, "error": "ユーザーが存在しません"},
-                         ensure_ascii=False))
-        sys.stdout.write("\r\n")
-        sys.stdout.flush()
+        send_json({"success": False, "error": "ユーザーが存在しません"})
         return
 
     allowed_ids = set(matched_user.get("allowed_file_ids", []))
     if file_id not in allowed_ids:
         write_log(username, "アクセス拒否", "file_id=" + file_id)
-        sys.stdout.write(json.dumps({"success": False,
-                          "error": "このファイルへのアクセス権がありません"},
-                         ensure_ascii=False))
-        sys.stdout.write("\r\n")
-        sys.stdout.flush()
+        send_json({"success": False, "error": "このファイルへのアクセス権がありません"})
         return
 
     # ファイル設定取得
     conf = next((f for f in files if f.get("id") == file_id), None)
     if conf is None:
-        sys.stdout.write(json.dumps({"success": False,
-                          "error": "file_id が見つかりません: " + file_id},
-                         ensure_ascii=False))
-        sys.stdout.write("\r\n")
-        sys.stdout.flush()
+        send_json({"success": False, "error": "file_id が見つかりません: " + file_id})
         return
 
     csv_file_path = conf.get("csv_file_path", "")
     read_enc      = normalize_encoding(conf.get("read_encoding", "utf-8"))
 
     if not os.path.exists(csv_file_path):
-        sys.stdout.write(json.dumps({"success": False,
-                          "error": "ファイルが見つかりません: " + csv_file_path},
-                         ensure_ascii=False))
-        sys.stdout.write("\r\n")
-        sys.stdout.flush()
+        send_json({"success": False, "error": "ファイルが見つかりません: " + csv_file_path})
         return
 
     try:
@@ -146,14 +131,10 @@ def main():
             "conf_name":        conf.get("name", ""),
             "editable_columns": conf.get("editable_columns", []),
         }
-        sys.stdout.write(json.dumps(result, ensure_ascii=False))
-        sys.stdout.write("\r\n")
-        sys.stdout.flush()
+        send_json(result)
 
     except Exception as e:
-        sys.stdout.write(json.dumps({"success": False, "error": str(e)}, ensure_ascii=False))
-        sys.stdout.write("\r\n")
-        sys.stdout.flush()
+        send_json({"success": False, "error": str(e)})
 
 if __name__ == "__main__":
     main()
