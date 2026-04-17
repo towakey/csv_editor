@@ -34,6 +34,17 @@ NEWLINE_MAP = {
     "\r\n": "\r\n", "\n": "\n", "\r": "\r",
 }
 
+def send_headers():
+    sys.stdout.write("Content-Type: application/json; charset=utf-8\r\n")
+    sys.stdout.write("Access-Control-Allow-Origin: *\r\n")
+    sys.stdout.write("\r\n")
+    sys.stdout.flush()
+
+def send_json(obj):
+    body = json.dumps(obj, ensure_ascii=False) + "\r\n"
+    sys.stdout.buffer.write(body.encode("utf-8"))
+    sys.stdout.flush()
+
 def normalize_encoding(enc):
     return ENCODING_MAP.get(enc.lower().replace(" ", ""), enc)
 
@@ -53,21 +64,14 @@ def write_log(username, action, detail=""):
         pass
 
 def main():
-    sys.stdout.write("Content-Type: application/json; charset=utf-8\r\n")
-    sys.stdout.write("Access-Control-Allow-Origin: *\r\n")
-    sys.stdout.write("\r\n")
-    sys.stdout.flush()
+    send_headers()
 
     method = os.environ.get("REQUEST_METHOD", "GET").upper()
     if method == "OPTIONS":
-        sys.stdout.write(json.dumps({"success": True}))
-        sys.stdout.write("\r\n")
-        sys.stdout.flush()
+        send_json({"success": True})
         return
     if method != "POST":
-        sys.stdout.write(json.dumps({"success": False, "error": "POST のみ受け付けます"}))
-        sys.stdout.write("\r\n")
-        sys.stdout.flush()
+        send_json({"success": False, "error": "POST のみ受け付けます"})
         return
 
     # setting.json 読み込み
@@ -75,11 +79,7 @@ def main():
         with open(SETTING_PATH, mode="r", encoding="utf-8") as f:
             setting = json.load(f)
     except Exception as e:
-        sys.stdout.write(json.dumps({"success": False,
-                          "error": "setting.json 読み込み失敗: " + str(e)},
-                         ensure_ascii=False))
-        sys.stdout.write("\r\n")
-        sys.stdout.flush()
+        send_json({"success": False, "error": "setting.json 読み込み失敗: " + str(e)})
         return
 
     files = setting.get("files", [])
@@ -88,9 +88,7 @@ def main():
     try:
         content_length = int(os.environ.get("CONTENT_LENGTH", 0))
         if content_length <= 0:
-            sys.stdout.write(json.dumps({"success": False, "error": "データが空です"}))
-            sys.stdout.write("\r\n")
-            sys.stdout.flush()
+            send_json({"success": False, "error": "データが空です"})
             return
 
         body    = sys.stdin.buffer.read(content_length)
@@ -102,40 +100,25 @@ def main():
         rows     = data.get("rows",     [])
 
         if not file_id or not username:
-            sys.stdout.write(json.dumps({"success": False,
-                              "error": "file_id と username は必須です"},
-                             ensure_ascii=False))
-            sys.stdout.write("\r\n")
-            sys.stdout.flush()
+            send_json({"success": False, "error": "file_id と username は必須です"})
             return
 
         # ユーザーの許可チェック
         matched_user = next((u for u in users if u.get("username") == username), None)
         if matched_user is None:
-            sys.stdout.write(json.dumps({"success": False, "error": "ユーザーが存在しません"},
-                             ensure_ascii=False))
-            sys.stdout.write("\r\n")
-            sys.stdout.flush()
+            send_json({"success": False, "error": "ユーザーが存在しません"})
             return
 
         allowed_ids = set(matched_user.get("allowed_file_ids", []))
         if file_id not in allowed_ids:
             write_log(username, "保存アクセス拒否", "file_id=" + file_id)
-            sys.stdout.write(json.dumps({"success": False,
-                              "error": "このファイルへの書き込み権限がありません"},
-                             ensure_ascii=False))
-            sys.stdout.write("\r\n")
-            sys.stdout.flush()
+            send_json({"success": False, "error": "このファイルへの書き込み権限がありません"})
             return
 
         # ファイル設定取得
         conf = next((f for f in files if f.get("id") == file_id), None)
         if conf is None:
-            sys.stdout.write(json.dumps({"success": False,
-                              "error": "file_id が見つかりません: " + file_id},
-                             ensure_ascii=False))
-            sys.stdout.write("\r\n")
-            sys.stdout.flush()
+            send_json({"success": False, "error": "file_id が見つかりません: " + file_id})
             return
 
         csv_file_path = conf.get("csv_file_path", "")
@@ -144,9 +127,7 @@ def main():
         create_backup = conf.get("create_backup", True)
 
         if not headers:
-            sys.stdout.write(json.dumps({"success": False, "error": "ヘッダーがありません"}))
-            sys.stdout.write("\r\n")
-            sys.stdout.flush()
+            send_json({"success": False, "error": "ヘッダーがありません"})
             return
 
         # バックアップ
@@ -165,23 +146,16 @@ def main():
         write_log(username, "ファイルを保存",
                   "id={} name={} rows={}".format(file_id, conf.get("name",""), len(rows)))
 
-        sys.stdout.write(json.dumps({
+        send_json({
             "success":    True,
             "message":    "保存しました ({} 行)".format(len(rows)),
             "saved_rows": len(rows),
-        }, ensure_ascii=False))
-        sys.stdout.write("\r\n")
-        sys.stdout.flush()
+        })
 
     except json.JSONDecodeError as e:
-        sys.stdout.write(json.dumps({"success": False, "error": "JSONパースエラー: " + str(e)},
-                         ensure_ascii=False))
-        sys.stdout.write("\r\n")
-        sys.stdout.flush()
+        send_json({"success": False, "error": "JSONパースエラー: " + str(e)})
     except Exception as e:
-        sys.stdout.write(json.dumps({"success": False, "error": str(e)}, ensure_ascii=False))
-        sys.stdout.write("\r\n")
-        sys.stdout.flush()
+        send_json({"success": False, "error": str(e)})
 
 if __name__ == "__main__":
     main()
