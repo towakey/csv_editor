@@ -232,6 +232,29 @@
       flex-wrap: wrap;
     }
     #table-toolbar.visible { display: flex; }
+    .row-delete-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: 4px;
+    }
+    #delete-row-number {
+      width: 84px;
+      padding: 7px 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-family: inherit;
+      color: var(--text);
+      background: #fff;
+    }
+    #delete-row-number:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37,99,235,.15);
+    }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger:hover:not(:disabled) { background: #b91c1c; }
     #row-info { font-size: 12px; color: var(--text-muted); margin-left: auto; }
 
     /* ═══════════════════════════════════════
@@ -348,6 +371,10 @@
   <div id="table-toolbar">
     <button class="btn btn-success" onclick="saveCSV()">💾 保存する</button>
     <button class="btn btn-primary" onclick="addRow()">➕ 行を追加</button>
+    <div class="row-delete-group">
+      <input type="number" id="delete-row-number" min="1" step="1" placeholder="行番号">
+      <button class="btn btn-danger" onclick="deleteRowByNumber()">🗑️ 指定行を削除</button>
+    </div>
     <button class="btn btn-outline" onclick="backToSelect()">&#8592; ファイル選択に戻る</button>
     <button class="btn btn-outline" onclick="reloadCSV()">🔄 再読み込み</button>
     <span id="row-info"></span>
@@ -392,6 +419,9 @@ document.addEventListener("DOMContentLoaded", function () {
   });
   document.getElementById("input-username").addEventListener("keydown", function (e) {
     if (e.key === "Enter") document.getElementById("input-password").focus();
+  });
+  document.getElementById("delete-row-number").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") deleteRowByNumber();
   });
 });
 
@@ -472,6 +502,7 @@ function doLogout() {
   document.getElementById("login-error").classList.remove("show");
   document.getElementById("file-list").innerHTML = "";
   document.getElementById("btn-open-selected").disabled = true;
+  document.getElementById("delete-row-number").value = "";
   setStatus("", "");
 }
 
@@ -558,6 +589,7 @@ function loadCSV(fileId) {
       currentFileId = fileId;
       currentConfName = data.conf_name || "";
       currentEditableColumns = editCols;
+      document.getElementById("delete-row-number").value = "";
 
       editableColIndexes = [];
       editCols.forEach(function (col) {
@@ -601,6 +633,7 @@ function backToSelect() {
   document.getElementById("select-screen").style.display = "";
   document.querySelectorAll(".file-card").forEach(function (c) { c.classList.remove("selected"); });
   document.getElementById("btn-open-selected").disabled = true;
+  document.getElementById("delete-row-number").value = "";
   setStatus("", "");
 }
 
@@ -731,6 +764,40 @@ function addRow() {
   csvRows = hotInstance.getData();
   updateRowInfo(currentConfName, currentEditableColumns);
   setStatus("新しい行を追加しました。編集可能列に値を入力してください。", "success");
+}
+
+function deleteRowByNumber() {
+  if (!hotInstance) { setStatus("テーブルが読み込まれていません", "error"); return; }
+
+  var input = document.getElementById("delete-row-number");
+  var raw = input.value.trim();
+  if (!raw) {
+    setStatus("削除する行番号を入力してください", "error");
+    input.focus();
+    return;
+  }
+
+  var rowNumber = Number(raw);
+  if (!Number.isInteger(rowNumber) || rowNumber < 1) {
+    setStatus("行番号は 1 以上の整数で入力してください", "error");
+    input.focus();
+    return;
+  }
+
+  var visualRow = rowNumber - 1;
+  if (visualRow >= hotInstance.countRows()) {
+    setStatus("指定した行番号が範囲外です（最大 " + hotInstance.countRows() + " 行）", "error");
+    input.focus();
+    return;
+  }
+
+  if (!confirm(rowNumber + " 行目を削除します。よいですか？")) return;
+
+  hotInstance.alter("remove_row", visualRow, 1);
+  csvRows = hotInstance.getData();
+  updateRowInfo(currentConfName, currentEditableColumns);
+  input.value = "";
+  setStatus(rowNumber + " 行目を削除しました", "success");
 }
 
 /* =================================================================
