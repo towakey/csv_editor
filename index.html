@@ -347,6 +347,7 @@
   <!-- ツールバー -->
   <div id="table-toolbar">
     <button class="btn btn-success" onclick="saveCSV()">💾 保存する</button>
+    <button class="btn btn-primary" onclick="addRow()">➕ 行を追加</button>
     <button class="btn btn-outline" onclick="backToSelect()">&#8592; ファイル選択に戻る</button>
     <button class="btn btn-outline" onclick="reloadCSV()">🔄 再読み込み</button>
     <span id="row-info"></span>
@@ -378,6 +379,8 @@ var hotInstance    = null;
 var csvHeaders     = [];
 var csvRows        = [];
 var editableColIndexes = [];
+var currentConfName = "";
+var currentEditableColumns = [];
 
 /* =================================================================
    初期化
@@ -553,6 +556,8 @@ function loadCSV(fileId) {
       csvRows    = data.rows    || [];
       var editCols = data.editable_columns || [];
       currentFileId = fileId;
+      currentConfName = data.conf_name || "";
+      currentEditableColumns = editCols;
 
       editableColIndexes = [];
       editCols.forEach(function (col) {
@@ -560,7 +565,7 @@ function loadCSV(fileId) {
         if (i >= 0) editableColIndexes.push(i);
       });
 
-      renderTable(data.conf_name, editCols);
+      renderTable(currentConfName, currentEditableColumns);
       setStatus(data.total_rows + " 行読み込みました", "success");
     })
     .catch(function (err) {
@@ -589,6 +594,7 @@ function backToSelect() {
   }
   currentFileId = null; selectedFileId = null;
   csvHeaders = []; csvRows = []; editableColIndexes = [];
+  currentConfName = ""; currentEditableColumns = [];
 
   document.getElementById("table-toolbar").classList.remove("visible");
   document.getElementById("table-wrapper").classList.remove("visible");
@@ -669,10 +675,22 @@ function renderTable(confName, editCols) {
       if (!changes || source === "loadData") return;
       changes.forEach(function (ch) {
         var pr = hotInstance.toPhysicalRow(ch[0]);
-        if (pr != null && csvRows[pr]) {
+        if (pr != null) {
+          if (!csvRows[pr]) csvRows[pr] = new Array(csvHeaders.length).fill("");
           csvRows[pr][ch[1]] = (ch[3] == null) ? "" : String(ch[3]);
         }
       });
+      updateRowInfo(confName, editCols);
+    },
+
+    afterCreateRow: function () {
+      csvRows = hotInstance.getData();
+      updateRowInfo(confName, editCols);
+    },
+
+    afterRemoveRow: function () {
+      csvRows = hotInstance.getData();
+      updateRowInfo(confName, editCols);
     },
 
     cells: function (row, col) {
@@ -685,11 +703,7 @@ function renderTable(confName, editCols) {
   document.getElementById("table-toolbar").classList.add("visible");
   document.getElementById("table-wrapper").classList.add("visible");
 
-  var label = confName ? "【" + confName + "】 " : "";
-  var ec    = (editCols || []).filter(function (c) { return csvHeaders.indexOf(c) >= 0; });
-  document.getElementById("row-info").textContent =
-    label + csvHeaders.length + " 列 / " + csvRows.length + " 行" +
-    (ec.length > 0 ? "  （編集可能列: " + ec.join(", ") + "）" : "");
+  updateRowInfo(confName, editCols);
 
   window.onresize = function () {
     if (!hotInstance) return;
@@ -701,6 +715,22 @@ function renderTable(confName, editCols) {
     document.getElementById("hot-container").style.height = nh + "px";
     hotInstance.render();
   };
+}
+
+function updateRowInfo(confName, editCols) {
+  var label = confName ? "【" + confName + "】 " : "";
+  var ec    = (editCols || []).filter(function (c) { return csvHeaders.indexOf(c) >= 0; });
+  document.getElementById("row-info").textContent =
+    label + csvHeaders.length + " 列 / " + csvRows.length + " 行" +
+    (ec.length > 0 ? "  （編集可能列: " + ec.join(", ") + "）" : "");
+}
+
+function addRow() {
+  if (!hotInstance) { setStatus("テーブルが読み込まれていません", "error"); return; }
+  hotInstance.alter("insert_row", hotInstance.countRows(), 1);
+  csvRows = hotInstance.getData();
+  updateRowInfo(currentConfName, currentEditableColumns);
+  setStatus("新しい行を追加しました。編集可能列に値を入力してください。", "success");
 }
 
 /* =================================================================
