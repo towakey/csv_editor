@@ -31,14 +31,14 @@ ENCODING_MAP = {
 
 def send_json(obj):
     body = (json.dumps(obj, ensure_ascii=False) + "\r\n").encode("utf-8")
-    headers = (
-        "Content-Type: application/json; charset=utf-8\r\n"
-        "Access-Control-Allow-Origin: *\r\n"
-        "Cache-Control: no-store\r\n"
-        "Content-Length: {}\r\n"
-        "\r\n"
-    ).format(len(body)).encode("ascii")
-    sys.stdout.buffer.write(headers + body)
+    sys.stdout.write("Content-Type: application/json; charset=utf-8\r\n")
+    sys.stdout.write("Access-Control-Allow-Origin: *\r\n")
+    sys.stdout.write("Cache-Control: no-store\r\n")
+    sys.stdout.write("Content-Length: {}\r\n".format(len(body)))
+    sys.stdout.write("Connection: close\r\n")
+    sys.stdout.write("\r\n")
+    sys.stdout.flush()
+    sys.stdout.buffer.write(body)
     sys.stdout.flush()
 
 def normalize_encoding(enc):
@@ -79,14 +79,6 @@ def main():
     parsed = parse_qs(qs, keep_blank_values=True)
     file_id = parsed.get("file_id", [""])[0]
     username = parsed.get("username", [""])[0]
-    offset = parse_int(parsed.get("offset", ["0"])[0], 0)
-    limit = parse_int(parsed.get("limit", ["1000"])[0], 1000)
-    if offset < 0:
-        offset = 0
-    if limit <= 0:
-        limit = 1000
-    if limit > 5000:
-        limit = 5000
 
     if not file_id or not username:
         send_json({"success": False, "error": "file_id と username は必須です"})
