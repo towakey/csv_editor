@@ -31,14 +31,14 @@ ENCODING_MAP = {
 
 def send_json(obj):
     body = (json.dumps(obj, ensure_ascii=False) + "\r\n").encode("utf-8")
-    headers = (
-        "Content-Type: application/json; charset=utf-8\r\n"
-        "Access-Control-Allow-Origin: *\r\n"
-        "Cache-Control: no-store\r\n"
-        "Content-Length: {}\r\n"
-        "\r\n"
-    ).format(len(body)).encode("ascii")
-    sys.stdout.buffer.write(headers + body)
+    sys.stdout.write("Content-Type: application/json; charset=utf-8\r\n")
+    sys.stdout.write("Access-Control-Allow-Origin: *\r\n")
+    sys.stdout.write("Cache-Control: no-store\r\n")
+    sys.stdout.write("Content-Length: {}\r\n".format(len(body)))
+    sys.stdout.write("Connection: close\r\n")
+    sys.stdout.write("\r\n")
+    sys.stdout.flush()
+    sys.stdout.buffer.write(body)
     sys.stdout.flush()
 
 def normalize_encoding(enc):
