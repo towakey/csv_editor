@@ -9,7 +9,7 @@ import json
 import csv
 import os
 import sys
-import hashlib
+from urllib.parse import parse_qs
 from datetime import datetime
 
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
@@ -29,19 +29,26 @@ ENCODING_MAP = {
     "euc_jp":      "euc_jp",
 }
 
-def send_headers():
-    sys.stdout.write("Content-Type: application/json; charset=utf-8\r\n")
-    sys.stdout.write("Access-Control-Allow-Origin: *\r\n")
-    sys.stdout.write("\r\n")
-    sys.stdout.flush()
-
 def send_json(obj):
-    body = json.dumps(obj, ensure_ascii=False) + "\r\n"
-    sys.stdout.buffer.write(body.encode("utf-8"))
+    body = (json.dumps(obj, ensure_ascii=False) + "\r\n").encode("utf-8")
+    headers = (
+        "Content-Type: application/json; charset=utf-8\r\n"
+        "Access-Control-Allow-Origin: *\r\n"
+        "Cache-Control: no-store\r\n"
+        "Content-Length: {}\r\n"
+        "\r\n"
+    ).format(len(body)).encode("ascii")
+    sys.stdout.buffer.write(headers + body)
     sys.stdout.flush()
 
 def normalize_encoding(enc):
     return ENCODING_MAP.get(enc.lower().replace(" ", ""), enc)
+
+def parse_int(value, default):
+    try:
+        return int(value)
+    except Exception:
+        return default
 
 def write_log(username, action, detail=""):
     timestamp  = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -56,8 +63,6 @@ def write_log(username, action, detail=""):
         pass
 
 def main():
-    send_headers()
-
     # setting.json 読み込み
     try:
         with open(SETTING_PATH, mode="r", encoding="utf-8") as f:
@@ -70,15 +75,18 @@ def main():
     users = setting.get("users", [])
 
     # GETパラメータ解析
-    qs       = os.environ.get("QUERY_STRING", "")
-    params   = {}
-    for p in qs.split("&"):
-        if "=" in p:
-            k, v = p.split("=", 1)
-            params[k] = v
-
-    file_id  = params.get("file_id", "")
-    username = params.get("username", "")
+    qs = os.environ.get("QUERY_STRING", "")
+    parsed = parse_qs(qs, keep_blank_values=True)
+    file_id = parsed.get("file_id", [""])[0]
+    username = parsed.get("username", [""])[0]
+    offset = parse_int(parsed.get("offset", ["0"])[0], 0)
+    limit = parse_int(parsed.get("limit", ["1000"])[0], 1000)
+    if offset < 0:
+        offset = 0
+    if limit <= 0:
+        limit = 1000
+    if limit > 5000:
+        limit = 5000
 
     if not file_id or not username:
         send_json({"success": False, "error": "file_id と username は必須です"})
@@ -123,11 +131,19 @@ def main():
         write_log(username, "ファイルを開く",
                   "id={} name={} rows={}".format(file_id, conf.get("name",""), len(rows)))
 
+        total_rows = len(rows)
+        page_rows = rows[offset: offset + limit]
+        has_more = (offset + len(page_rows)) < total_rows
+
         result = {
             "success":          True,
             "headers":          headers,
-            "rows":             rows,
-            "total_rows":       len(rows),
+            "rows":             page_rows,
+            "total_rows":       total_rows,
+            "offset":           offset,
+            "limit":            limit,
+            "returned_rows":    len(page_rows),
+            "has_more":         has_more,
             "conf_name":        conf.get("name", ""),
             "editable_columns": conf.get("editable_columns", []),
         }
