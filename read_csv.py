@@ -44,6 +44,12 @@ def send_json(obj):
 def normalize_encoding(enc):
     return ENCODING_MAP.get(enc.lower().replace(" ", ""), enc)
 
+def parse_int(value, default):
+    try:
+        return int(value)
+    except Exception:
+        return default
+
 def write_log(username, action, detail=""):
     timestamp  = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     file_exists = os.path.exists(LOG_PATH)
@@ -117,11 +123,19 @@ def main():
         write_log(username, "ファイルを開く",
                   "id={} name={} rows={}".format(file_id, conf.get("name",""), len(rows)))
 
+        total_rows = len(rows)
+        page_rows = rows[offset: offset + limit]
+        has_more = (offset + len(page_rows)) < total_rows
+
         result = {
             "success":          True,
             "headers":          headers,
-            "rows":             rows,
-            "total_rows":       len(rows),
+            "rows":             page_rows,
+            "total_rows":       total_rows,
+            "offset":           offset,
+            "limit":            limit,
+            "returned_rows":    len(page_rows),
+            "has_more":         has_more,
             "conf_name":        conf.get("name", ""),
             "editable_columns": conf.get("editable_columns", []),
         }
