@@ -79,6 +79,13 @@ def main():
     parsed = parse_qs(qs, keep_blank_values=True)
     file_id = parsed.get("file_id", [""])[0]
     username = parsed.get("username", [""])[0]
+    offset = parse_int(parsed.get("offset", ["0"])[0], 0)
+    limit = parse_int(parsed.get("limit", ["1000"])[0], 1000)
+
+    if offset < 0:
+        offset = 0
+    if limit <= 0:
+        limit = 1000
 
     if not file_id or not username:
         send_json({"success": False, "error": "file_id と username は必須です"})
