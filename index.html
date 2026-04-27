@@ -569,25 +569,56 @@ function onOpenSelected() {
 function loadCSV(fileId) {
   showLoading("CSVを読み込み中...");
   setStatus("", "");
+  var pageSize = 1000;
+  var offset = 0;
+  var allRows = [];
+  var headers = [];
+  var totalRows = 0;
+  var editCols = [];
+  var confName = "";
 
-  fetch(READ_CSV_URL + "?file_id=" + encodeURIComponent(fileId) +
-        "&username=" + encodeURIComponent(currentUser.username), {
-    method: "GET",
-    headers: { "Cache-Control": "no-cache" }
-  })
-    .then(function (res) {
-      if (!res.ok) throw new Error("HTTPエラー: " + res.status);
-      return res.json();
+  function fetchPage() {
+    var url = READ_CSV_URL +
+      "?file_id=" + encodeURIComponent(fileId) +
+      "&username=" + encodeURIComponent(currentUser.username) +
+      "&offset=" + encodeURIComponent(String(offset)) +
+      "&limit=" + encodeURIComponent(String(pageSize));
+
+    return fetch(url, {
+      method: "GET",
+      headers: { "Cache-Control": "no-cache" }
     })
-    .then(function (data) {
-      hideLoading();
-      if (!data.success) { setStatus("エラー: " + data.error, "error"); return; }
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTPエラー: " + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        if (!data.success) throw new Error(data.error || "読み込みエラー");
 
-      csvHeaders = data.headers || [];
-      csvRows    = data.rows    || [];
-      var editCols = data.editable_columns || [];
+        if (!headers.length) headers = data.headers || [];
+        if (!confName) confName = data.conf_name || "";
+        if (!editCols.length) editCols = data.editable_columns || [];
+        totalRows = data.total_rows || 0;
+
+        var pageRows = data.rows || [];
+        allRows = allRows.concat(pageRows);
+
+        showLoading("CSVを読み込み中... " + allRows.length + " / " + totalRows + " 行");
+
+        if (data.has_more) {
+          offset += pageRows.length;
+          return fetchPage();
+        }
+      });
+  }
+
+  fetchPage()
+    .then(function () {
+      hideLoading();
+      csvHeaders = headers;
+      csvRows = allRows;
       currentFileId = fileId;
-      currentConfName = data.conf_name || "";
+      currentConfName = confName;
       currentEditableColumns = editCols;
       document.getElementById("delete-row-number").value = "";
 
@@ -598,7 +629,7 @@ function loadCSV(fileId) {
       });
 
       renderTable(currentConfName, currentEditableColumns);
-      setStatus(data.total_rows + " 行読み込みました", "success");
+      setStatus(csvRows.length + " / " + totalRows + " 行読み込みました", "success");
     })
     .catch(function (err) {
       hideLoading();
