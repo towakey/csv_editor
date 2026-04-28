@@ -668,6 +668,11 @@ function backToSelect() {
   setStatus("", "");
 }
 
+function getFiltersPlugin() {
+  if (!hotInstance) return null;
+  return hotInstance.getPlugin("filters") || hotInstance.getPlugin("Filters") || null;
+}
+
 /* =================================================================
    Handsontable レンダリング
    ================================================================= */
@@ -715,14 +720,32 @@ function renderTable(confName, editCols) {
             var col = sel[1];
             var val = prompt(csvHeaders[col] + " の検索文字列を入力");
             if (val === null) return;
-            var f = hotInstance.getPlugin("filters");
+            var f = getFiltersPlugin();
+            if (!f) {
+              setStatus("フィルタープラグインが利用できません", "error");
+              return;
+            }
+            if (typeof f.clearConditions !== "function" ||
+                typeof f.addCondition !== "function" ||
+                typeof f.filter !== "function") {
+              setStatus("フィルター機能がこの環境では利用できません", "error");
+              return;
+            }
             f.clearConditions(); f.addCondition(col, "contains", [val]); f.filter();
           }
         },
         "clear_filter": {
           name: "フィルター解除",
           callback: function () {
-            var f = hotInstance.getPlugin("filters");
+            var f = getFiltersPlugin();
+            if (!f) {
+              setStatus("フィルタープラグインが利用できません", "error");
+              return;
+            }
+            if (typeof f.clearConditions !== "function" || typeof f.filter !== "function") {
+              setStatus("フィルター機能がこの環境では利用できません", "error");
+              return;
+            }
             f.clearConditions(); f.filter();
           }
         }
