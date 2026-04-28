@@ -786,19 +786,9 @@ function renderTable(confName, editCols) {
       if (!event || event.button !== 0) return;
 
       var col = coords.col;
-      var f = getFiltersPlugin();
-      if (!f) {
-        setStatus("フィルタープラグインが利用できません", "error");
-        return;
-      }
-      if (typeof f.removeConditions !== "function" ||
-          typeof f.addCondition !== "function" ||
-          typeof f.filter !== "function") {
-        setStatus("フィルター機能がこの環境では利用できません", "error");
-        return;
-      }
+      var f = hotInstance.getPlugin("filters");
       var currentValue = "";
-      var conditions = (typeof f.getConditions === "function") ? f.getConditions(col) : [];
+      var conditions = f.getConditions(col);
       if (conditions && conditions.length > 0 && conditions[0].name === "contains") {
         currentValue = (conditions[0].args && conditions[0].args[0]) ? String(conditions[0].args[0]) : "";
       }
