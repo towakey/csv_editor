@@ -699,6 +699,7 @@ function renderTable(confName, editCols) {
     columnSorting:      true,
     language:           "ja-JP",
     licenseKey:         "non-commercial-and-evaluation",
+    outsideClickDeselects: false,
 
     contextMenu: {
       items: {
@@ -755,6 +756,31 @@ function renderTable(confName, editCols) {
     afterRemoveRow: function () {
       csvRows = hotInstance.getData();
       updateRowInfo(confName, editCols);
+    },
+
+    afterOnCellMouseDown: function (event, coords) {
+      if (!coords || coords.row !== -1 || coords.col < 0) return;
+      if (!event || event.button !== 0) return;
+
+      var col = coords.col;
+      var f = hotInstance.getPlugin("filters");
+      var currentValue = "";
+      var conditions = f.getConditions(col);
+      if (conditions && conditions.length > 0 && conditions[0].name === "contains") {
+        currentValue = (conditions[0].args && conditions[0].args[0]) ? String(conditions[0].args[0]) : "";
+      }
+
+      var val = prompt(
+        csvHeaders[col] + " の検索文字列を入力してください\n" +
+        "（空欄でこの列のフィルター解除）",
+        currentValue
+      );
+      if (val === null) return;
+
+      var keyword = val.trim();
+      f.removeConditions(col);
+      if (keyword) f.addCondition(col, "contains", [keyword]);
+      f.filter();
     },
 
     cells: function (row, col) {
