@@ -389,6 +389,83 @@
 
 <script src="handsontable-6.2.2/dist/handsontable.full.min.js"></script>
 <script>
+Handsontable.languages.registerLanguageDictionary({
+  languageCode: 'ja-JP',
+  'ContextMenu:items.insertRowAbove': '行を上に挿入',
+  'ContextMenu:items.insertRowBelow': '行を下に挿入',
+  'ContextMenu:items.insertColumnOnTheLeft': '列を左に挿入',
+  'ContextMenu:items.insertColumnOnTheRight': '列を右に挿入',
+  'ContextMenu:items.removeRow': ['行を削除', '行を削除'],
+  'ContextMenu:items.removeColumn': ['列を削除', '列を削除'],
+  'ContextMenu:items.undo': '元に戻す',
+  'ContextMenu:items.redo': 'やり直し',
+  'ContextMenu:items.readOnly': '読み取り専用',
+  'ContextMenu:items.clearColumn': '列をクリア',
+  'ContextMenu:items.align': '配置',
+  'ContextMenu:items.align.left': '左揃え',
+  'ContextMenu:items.align.center': '中央揃え',
+  'ContextMenu:items.align.right': '右揃え',
+  'ContextMenu:items.align.justify': '両端揃え',
+  'ContextMenu:items.align.top': '上揃え',
+  'ContextMenu:items.align.middle': '中央揃え(垂直)',
+  'ContextMenu:items.align.bottom': '下揃え',
+  'ContextMenu:items.freezeColumn': '列を固定',
+  'ContextMenu:items.unfreezeColumn': '列の固定を解除',
+  'ContextMenu:items.borders': '枠線',
+  'ContextMenu:items.borders.top': '上',
+  'ContextMenu:items.borders.right': '右',
+  'ContextMenu:items.borders.bottom': '下',
+  'ContextMenu:items.borders.left': '左',
+  'ContextMenu:items.borders.remove': '枠線を削除',
+  'ContextMenu:items.addComment': 'コメントを追加',
+  'ContextMenu:items.editComment': 'コメントを編集',
+  'ContextMenu:items.removeComment': 'コメントを削除',
+  'ContextMenu:items.readOnlyComment': '読み取り専用コメント',
+  'ContextMenu:items.mergeCells': 'セルを結合',
+  'ContextMenu:items.unmergeCells': 'セルの結合を解除',
+  'ContextMenu:items.copy': 'コピー',
+  'ContextMenu:items.cut': '切り取り',
+  'ContextMenu:items.nestedHeaders.insertChildRow': '子の行を挿入',
+  'ContextMenu:items.nestedHeaders.detachFromParent': '親の行と切り離す',
+  'ContextMenu:items.hideColumn': ['列を非表示', '列を非表示'],
+  'ContextMenu:items.showColumn': ['列を表示', '列を表示'],
+  'ContextMenu:items.hideRow': ['行を非表示', '行を非表示'],
+  'ContextMenu:items.showRow': ['行を表示', '行を表示'],
+  'Filters:conditions.none': 'なし',
+  'Filters:conditions.isEmpty': '空白',
+  'Filters:conditions.isNotEmpty': '空白ではない',
+  'Filters:conditions.isEqualTo': '次と等しい',
+  'Filters:conditions.isNotEqualTo': '次と等しくない',
+  'Filters:conditions.beginsWith': '次で始まる',
+  'Filters:conditions.endsWith': '次で終わる',
+  'Filters:conditions.contains': '次を含む',
+  'Filters:conditions.doesNotContain': '次を含まない',
+  'Filters:conditions.greaterThan': '次より大きい',
+  'Filters:conditions.greaterThanOrEqual': '以上',
+  'Filters:conditions.lessThan': '次より小さい',
+  'Filters:conditions.lessThanOrEqual': '以下',
+  'Filters:conditions.isBetween': '次の間にある',
+  'Filters:conditions.isNotBetween': '次の間にない',
+  'Filters:conditions.after': '次より後の日付',
+  'Filters:conditions.before': '次より前の日付',
+  'Filters:conditions.today': '今日',
+  'Filters:conditions.tomorrow': '明日',
+  'Filters:conditions.yesterday': '昨日',
+  'Filters:values.blankCells': '空白のセル',
+  'Filters:labels.filterByCondition': '条件でフィルタ',
+  'Filters:labels.filterByValue': '値でフィルタ',
+  'Filters:labels.conjunction': 'かつ',
+  'Filters:labels.disjunction': 'もしくは',
+  'Filters:buttons.selectAll': 'すべて選択',
+  'Filters:buttons.clear': 'クリア',
+  'Filters:buttons.ok': 'OK',
+  'Filters:buttons.cancel': 'キャンセル',
+  'Filters:buttons.placeholder.search': '検索',
+  'Filters:buttons.placeholder.value': '値',
+  'Filters:buttons.placeholder.secondValue': '値2'
+});
+</script>
+<script>
 /* =================================================================
    URL 定数
    ================================================================= */
@@ -786,7 +863,8 @@ function renderTable(confName, editCols) {
       if (!event || event.button !== 0) return;
 
       var col = coords.col;
-      var f = hotInstance.getPlugin("filters");
+      var f = getFiltersPlugin();
+      if (!f) return;
       var currentValue = "";
       var conditions = f.getConditions(col);
       if (conditions && conditions.length > 0 && conditions[0].name === "contains") {
