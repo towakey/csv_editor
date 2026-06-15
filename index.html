@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CSV エディタ</title>
-  <link rel="stylesheet" href="handsontable-6.2.2/dist/handsontable.full.min.css">
+  <!-- Handsontable 14.6.1 (Filters/DropdownMenu を含む)
+       ローカル配置の場合は CDN URL をローカルパスに置き換えてください -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@14.6.1/dist/handsontable.full.min.css">
   <style>
     :root {
       --bg:         #f0f4f8;
@@ -387,7 +389,7 @@
 
 </main>
 
-<script src="handsontable-6.2.2/dist/handsontable.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/handsontable@14.6.1/dist/handsontable.full.min.js"></script>
 <script>
 Handsontable.languages.registerLanguageDictionary({
   languageCode: 'ja-JP',
@@ -861,12 +863,14 @@ function renderTable(confName, editCols) {
     afterOnCellMouseDown: function (event, coords) {
       if (!coords || coords.row !== -1 || coords.col < 0) return;
       if (!event || event.button !== 0) return;
+      var target = event.target || event.realTarget;
+      if (target && target.closest && target.closest('.changeType')) return;
 
       var col = coords.col;
       var f = getFiltersPlugin();
       if (!f) return;
       var currentValue = "";
-      var conditions = f.getConditions(col);
+      var conditions = (typeof f.getConditions === 'function') ? f.getConditions(col) : [];
       if (conditions && conditions.length > 0 && conditions[0].name === "contains") {
         currentValue = (conditions[0].args && conditions[0].args[0]) ? String(conditions[0].args[0]) : "";
       }
@@ -918,7 +922,7 @@ function updateRowInfo(confName, editCols) {
 
 function addRow() {
   if (!hotInstance) { setStatus("テーブルが読み込まれていません", "error"); return; }
-  hotInstance.alter("insert_row", hotInstance.countRows(), 1);
+  hotInstance.alter("insert_row_below", hotInstance.countRows() - 1, 1);
   csvRows = hotInstance.getData();
   updateRowInfo(currentConfName, currentEditableColumns);
   setStatus("新しい行を追加しました。編集可能列に値を入力してください。", "success");
