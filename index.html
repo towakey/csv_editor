@@ -255,7 +255,12 @@
     }
     .btn-danger { background: var(--danger); color: #fff; }
     .btn-danger:hover:not(:disabled) { background: #b91c1c; }
+    .btn-warning { background: #f59e0b; color: #fff; }
+    .btn-warning:hover:not(:disabled) { background: #d97706; }
     #row-info { font-size: 12px; color: var(--text-muted); margin-left: auto; }
+    #filter-info { display: none; font-size: 12px; color: #b45309; background: #fef3c7; border: 1px solid #fde68a; border-radius: var(--radius); padding: 4px 10px; }
+    #filter-info.show { display: inline-flex; align-items: center; gap: 6px; }
+    .filter-indicator { color: var(--primary); font-size: 10px; margin-left: 2px; }
 
     /* ═══════════════════════════════════════
        テーブルラッパー
@@ -377,6 +382,8 @@
     </div>
     <button class="btn btn-outline" onclick="backToSelect()">&#8592; ファイル選択に戻る</button>
     <button class="btn btn-outline" onclick="reloadCSV()">🔄 再読み込み</button>
+    <button class="btn btn-warning" id="btn-clear-filter" onclick="clearAllFilters()" style="display:none;">✕ フィルター解除</button>
+    <span id="filter-info"></span>
     <span id="row-info"></span>
   </div>
 
@@ -481,7 +488,10 @@ var selectedFileId = null;
 var currentFileId  = null;
 var hotInstance    = null;
 var csvHeaders     = [];
-var csvRows        = [];
+var csvRows        = [];          // 現在表示中の行 (フィルター時はサブセット)
+var masterRows     = [];          // 全行のマスターデータ
+var activeFilters  = {};          // { colIndex: "keyword", ... }
+var filterMap      = null;        // null=フィルターなし, Array=フィルター行→masterRowsインデックス
 var editableColIndexes = [];
 var currentConfName = "";
 var currentEditableColumns = [];
@@ -566,8 +576,11 @@ function doLogout() {
     hotInstance = null;
   }
   currentUser = null; selectedFileId = null; currentFileId = null;
-  csvHeaders = []; csvRows = []; editableColIndexes = [];
+  csvHeaders = []; csvRows = []; masterRows = []; editableColIndexes = [];
+  activeFilters = {}; filterMap = null;
 
+  document.getElementById("btn-clear-filter").style.display = "none";
+  document.getElementById("filter-info").classList.remove("show");
   document.getElementById("table-toolbar").classList.remove("visible");
   document.getElementById("table-wrapper").classList.remove("visible");
   document.getElementById("select-screen").style.display = "";
@@ -733,8 +746,11 @@ function backToSelect() {
     hotInstance = null;
   }
   currentFileId = null; selectedFileId = null;
-  csvHeaders = []; csvRows = []; editableColIndexes = [];
+  csvHeaders = []; csvRows = []; masterRows = []; editableColIndexes = [];
+  activeFilters = {}; filterMap = null;
   currentConfName = ""; currentEditableColumns = [];
+  document.getElementById("btn-clear-filter").style.display = "none";
+  document.getElementById("filter-info").classList.remove("show");
 
   document.getElementById("table-toolbar").classList.remove("visible");
   document.getElementById("table-wrapper").classList.remove("visible");
@@ -745,9 +761,77 @@ function backToSelect() {
   setStatus("", "");
 }
 
-function getFiltersPlugin() {
-  if (!hotInstance) return null;
-  return hotInstance.getPlugin("filters") || hotInstance.getPlugin("Filters") || null;
+/* =================================================================
+   カスタムフィルター機能 (Handsontable CE 6.2.2 用)
+   ================================================================= */
+function computeFilteredView() {
+  var keys = Object.keys(activeFilters);
+  if (keys.length === 0) { filterMap = null; return masterRows; }
+  var indices = [];
+  for (var i = 0; i < masterRows.length; i++) {
+    var match = true;
+    for (var k = 0; k < keys.length; k++) {
+      var col = parseInt(keys[k], 10);
+      var keyword = activeFilters[keys[k]].toLowerCase();
+      var cell = String(masterRows[i][col] || "").toLowerCase();
+      if (cell.indexOf(keyword) < 0) { match = false; break; }
+    }
+    if (match) indices.push(i);
+  }
+  filterMap = indices;
+  return indices.map(function (idx) { return masterRows[idx]; });
+}
+
+function toMasterRowIndex(physicalRow) {
+  if (filterMap === null) return physicalRow;
+  if (physicalRow < 0 || physicalRow >= filterMap.length) return -1;
+  return filterMap[physicalRow];
+}
+
+function applyColumnFilter(col, keyword) {
+  if (keyword) {
+    activeFilters[col] = keyword;
+  } else {
+    delete activeFilters[col];
+  }
+  refreshFilteredView();
+}
+
+function clearAllFilters() {
+  activeFilters = {};
+  refreshFilteredView();
+  setStatus("フィルターを解除しました", "success");
+}
+
+function refreshFilteredView() {
+  if (!hotInstance) return;
+  var displayRows = computeFilteredView();
+  csvRows = displayRows;
+  hotInstance.loadData(displayRows);
+  updateFilterUI();
+  updateRowInfo(currentConfName, currentEditableColumns);
+}
+
+function updateFilterUI() {
+  var keys = Object.keys(activeFilters);
+  var btnClear = document.getElementById("btn-clear-filter");
+  var filterInfo = document.getElementById("filter-info");
+  if (keys.length === 0) {
+    btnClear.style.display = "none";
+    filterInfo.classList.remove("show");
+  } else {
+    btnClear.style.display = "";
+    var parts = keys.map(function (k) {
+      var colName = csvHeaders[parseInt(k, 10)] || ("Col" + k);
+      return colName + "「" + activeFilters[k] + "」";
+    });
+    filterInfo.textContent = "🔍 " + parts.join(", ");
+    filterInfo.classList.add("show");
+  }
+}
+
+function isFilterActive() {
+  return Object.keys(activeFilters).length > 0;
 }
 
 /* =================================================================
@@ -755,6 +839,10 @@ function getFiltersPlugin() {
    ================================================================= */
 function renderTable(confName, editCols) {
   if (hotInstance) { hotInstance.destroy(); hotInstance = null; }
+
+  masterRows = csvRows.map(function (r) { return r.slice(); });
+  activeFilters = {};
+  filterMap = null;
 
   var colSettings = csvHeaders.map(function (h, i) {
     var editable = editableColIndexes.indexOf(i) >= 0;
@@ -767,8 +855,10 @@ function renderTable(confName, editCols) {
   if (h < 300) h = 300;
   document.getElementById("hot-container").style.height = h + "px";
 
+  updateFilterUI();
+
   hotInstance = new Handsontable(document.getElementById("hot-container"), {
-    data:               csvRows,
+    data:               masterRows,
     colHeaders:         csvHeaders,
     columns:            colSettings,
     rowHeaders:         true,
@@ -776,8 +866,6 @@ function renderTable(confName, editCols) {
     manualColumnResize: true,
     viewportRowRenderingOffset: 50,
     copyPaste:          true,
-    filters:            true,
-    dropdownMenu:       true,
     columnSorting:      true,
     language:           "ja-JP",
     licenseKey:         "non-commercial-and-evaluation",
@@ -795,36 +883,16 @@ function renderTable(confName, editCols) {
             var sel = hotInstance.getSelectedLast();
             if (!sel) return;
             var col = sel[1];
-            var val = prompt(csvHeaders[col] + " の検索文字列を入力");
+            var current = activeFilters[col] || "";
+            var val = prompt(csvHeaders[col] + " の検索文字列を入力\n（空欄でこの列のフィルター解除）", current);
             if (val === null) return;
-            var f = getFiltersPlugin();
-            if (!f) {
-              setStatus("フィルタープラグインが利用できません", "error");
-              return;
-            }
-            if (typeof f.clearConditions !== "function" ||
-                typeof f.addCondition !== "function" ||
-                typeof f.filter !== "function") {
-              setStatus("フィルター機能がこの環境では利用できません", "error");
-              return;
-            }
-            f.clearConditions(); f.addCondition(col, "contains", [val]); f.filter();
+            applyColumnFilter(col, val.trim());
           }
         },
         "clear_filter": {
           name: "フィルター解除",
-          callback: function () {
-            var f = getFiltersPlugin();
-            if (!f) {
-              setStatus("フィルタープラグインが利用できません", "error");
-              return;
-            }
-            if (typeof f.clearConditions !== "function" || typeof f.filter !== "function") {
-              setStatus("フィルター機能がこの環境では利用できません", "error");
-              return;
-            }
-            f.clearConditions(); f.filter();
-          }
+          disabled: function () { return !isFilterActive(); },
+          callback: function () { clearAllFilters(); }
         }
       }
     },
@@ -839,22 +907,13 @@ function renderTable(confName, editCols) {
     afterChange: function (changes, source) {
       if (!changes || source === "loadData") return;
       changes.forEach(function (ch) {
-        var pr = hotInstance.toPhysicalRow(ch[0]);
-        if (pr != null) {
-          if (!csvRows[pr]) csvRows[pr] = new Array(csvHeaders.length).fill("");
-          csvRows[pr][ch[1]] = (ch[3] == null) ? "" : String(ch[3]);
+        var physRow = hotInstance.toPhysicalRow(ch[0]);
+        if (physRow == null) return;
+        var mi = toMasterRowIndex(physRow);
+        if (mi >= 0 && mi < masterRows.length) {
+          masterRows[mi][ch[1]] = (ch[3] == null) ? "" : String(ch[3]);
         }
       });
-      updateRowInfo(confName, editCols);
-    },
-
-    afterCreateRow: function () {
-      csvRows = hotInstance.getData();
-      updateRowInfo(confName, editCols);
-    },
-
-    afterRemoveRow: function () {
-      csvRows = hotInstance.getData();
       updateRowInfo(confName, editCols);
     },
 
@@ -863,25 +922,14 @@ function renderTable(confName, editCols) {
       if (!event || event.button !== 0) return;
 
       var col = coords.col;
-      var f = getFiltersPlugin();
-      if (!f) return;
-      var currentValue = "";
-      var conditions = f.getConditions(col);
-      if (conditions && conditions.length > 0 && conditions[0].name === "contains") {
-        currentValue = (conditions[0].args && conditions[0].args[0]) ? String(conditions[0].args[0]) : "";
-      }
-
+      var current = activeFilters[col] || "";
       var val = prompt(
         csvHeaders[col] + " の検索文字列を入力してください\n" +
         "（空欄でこの列のフィルター解除）",
-        currentValue
+        current
       );
       if (val === null) return;
-
-      var keyword = val.trim();
-      f.removeConditions(col);
-      if (keyword) f.addCondition(col, "contains", [keyword]);
-      f.filter();
+      applyColumnFilter(col, val.trim());
     },
 
     cells: function (row, col) {
@@ -911,17 +959,27 @@ function renderTable(confName, editCols) {
 function updateRowInfo(confName, editCols) {
   var label = confName ? "【" + confName + "】 " : "";
   var ec    = (editCols || []).filter(function (c) { return csvHeaders.indexOf(c) >= 0; });
+  var rowLabel = isFilterActive()
+    ? csvRows.length + " / " + masterRows.length + " 行 (フィルター中)"
+    : masterRows.length + " 行";
   document.getElementById("row-info").textContent =
-    label + csvHeaders.length + " 列 / " + csvRows.length + " 行" +
+    label + csvHeaders.length + " 列 / " + rowLabel +
     (ec.length > 0 ? "  （編集可能列: " + ec.join(", ") + "）" : "");
 }
 
 function addRow() {
   if (!hotInstance) { setStatus("テーブルが読み込まれていません", "error"); return; }
-  hotInstance.alter("insert_row", hotInstance.countRows(), 1);
-  csvRows = hotInstance.getData();
-  updateRowInfo(currentConfName, currentEditableColumns);
-  setStatus("新しい行を追加しました。編集可能列に値を入力してください。", "success");
+  var newRow = new Array(csvHeaders.length).fill("");
+  masterRows.push(newRow);
+  if (isFilterActive()) {
+    refreshFilteredView();
+    setStatus("新しい行を追加しました。フィルターに一致しない場合は解除後に編集してください。", "success");
+  } else {
+    csvRows = masterRows;
+    hotInstance.loadData(masterRows);
+    updateRowInfo(currentConfName, currentEditableColumns);
+    setStatus("新しい行を追加しました。編集可能列に値を入力してください。", "success");
+  }
 }
 
 function deleteRowByNumber() {
@@ -951,9 +1009,12 @@ function deleteRowByNumber() {
 
   if (!confirm(rowNumber + " 行目を削除します。よいですか？")) return;
 
-  hotInstance.alter("remove_row", visualRow, 1);
-  csvRows = hotInstance.getData();
-  updateRowInfo(currentConfName, currentEditableColumns);
+  var physRow = hotInstance.toPhysicalRow(visualRow);
+  var mi = toMasterRowIndex(physRow != null ? physRow : visualRow);
+  if (mi >= 0 && mi < masterRows.length) {
+    masterRows.splice(mi, 1);
+  }
+  refreshFilteredView();
   input.value = "";
   setStatus(rowNumber + " 行目を削除しました", "success");
 }
@@ -968,7 +1029,7 @@ function saveCSV() {
   showLoading("保存中...");
   setStatus("", "");
 
-  var cleanRows = csvRows.map(function (row) {
+  var cleanRows = masterRows.map(function (row) {
     return row.map(function (c) { return (c == null) ? "" : String(c); });
   });
 
