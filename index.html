@@ -495,7 +495,7 @@
 
 </main>
 
-<!-- ═══ admin専用 作業履歴 ═══ -->
+<!-- ═══ 作業履歴 ═══ -->
 <div id="history-modal" role="dialog" aria-modal="true" aria-labelledby="history-title">
   <section class="history-panel">
     <div class="history-header">
@@ -672,7 +672,7 @@ function doLogin() {
       document.getElementById("input-password").value = "";
       document.getElementById("login-screen").style.display = "none";
       document.getElementById("header-display-name").textContent = data.display_name;
-      document.getElementById("btn-history").style.display = data.is_admin ? "" : "none";
+      document.getElementById("btn-history").style.display = data.can_view_history ? "" : "none";
       document.getElementById("app-header").classList.add("show");
       document.getElementById("main").classList.add("show");
       buildFileList(data.allowed_files || []);
@@ -1189,10 +1189,10 @@ function saveCSV() {
 }
 
 /* =================================================================
-   admin専用 作業履歴
+   作業履歴
    ================================================================= */
 function openHistory() {
-  if (!currentUser || !currentUser.is_admin) return;
+  if (!currentUser || !currentUser.can_view_history) return;
 
   var filter = document.getElementById("history-file-filter");
   filter.innerHTML = '<option value="">すべてのファイル</option>';
@@ -1212,7 +1212,7 @@ function closeHistory() {
 }
 
 function loadHistory() {
-  if (!currentUser || !currentUser.is_admin) return;
+  if (!currentUser || !currentUser.can_view_history) return;
 
   var list = document.getElementById("history-list");
   var fileId = document.getElementById("history-file-filter").value;

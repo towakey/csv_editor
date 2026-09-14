@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-read_history.py - admin専用のCSV変更履歴取得CGI
-GETパラメータ: ?username=admin&file_id=order
+read_history.py - 権限ユーザー向けCSV変更履歴取得CGI
+GETパラメータ: ?username=user1&file_id=order
 """
 
 import csv
@@ -10,7 +10,7 @@ import json
 import os
 from urllib.parse import parse_qs
 
-from auth_common import is_admin_user, validate_auth_token
+from auth_common import can_view_history, validate_auth_token
 from cgi_response import send_json
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -61,20 +61,24 @@ def main():
     file_id = parsed.get("file_id", [""])[0]
     auth_token = os.environ.get("HTTP_X_AUTH_TOKEN", "")
     users = setting.get("users", [])
-    admin_user = validate_auth_token(users, username, auth_token)
+    authenticated_user = validate_auth_token(users, username, auth_token)
 
-    if admin_user is None:
+    if authenticated_user is None:
         send_json({"success": False, "error": "認証の有効期限が切れました。再ログインしてください"})
         return
-    if not is_admin_user(admin_user):
-        send_json({"success": False, "error": "作業履歴はadminユーザーのみ閲覧できます"})
+    if not can_view_history(authenticated_user):
+        send_json({"success": False, "error": "作業履歴を閲覧する権限がありません"})
         return
 
-    files = setting.get("files", [])
+    allowed_file_ids = set(authenticated_user.get("allowed_file_ids", []))
+    files = [
+        conf for conf in setting.get("files", [])
+        if conf.get("id") in allowed_file_ids
+    ]
     if file_id:
         files = [conf for conf in files if conf.get("id") == file_id]
         if not files:
-            send_json({"success": False, "error": "file_id が見つかりません: " + file_id})
+            send_json({"success": False, "error": "閲覧可能なfile_idではありません: " + file_id})
             return
 
     try:

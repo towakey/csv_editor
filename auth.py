@@ -11,7 +11,7 @@ import sys
 import csv
 from datetime import datetime
 
-from auth_common import create_auth_token, is_admin_user
+from auth_common import can_view_history, create_auth_token, is_admin_user
 from cgi_response import send_json
 
 # cgitb は使用しない（HTMLエラーがJSONレスポンスに混入するため）
@@ -115,6 +115,7 @@ def main():
         "username":      username,
         "display_name":  matched_user.get("display_name", username),
         "is_admin":      is_admin_user(matched_user),
+        "can_view_history": can_view_history(matched_user),
         "auth_token":    create_auth_token(matched_user),
         "allowed_files": allowed_files,
     })
