@@ -50,7 +50,7 @@ def read_history(conf):
         return []
 
     entries = []
-    with open(path, mode="r", encoding="utf-8-sig", newline="") as history_file:
+    with open(path, mode="r", encoding="utf-8", newline="") as history_file:
         reader = csv.reader(history_file)
         next(reader, None)
         for row in reader:

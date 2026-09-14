@@ -4,8 +4,8 @@
       "id": "order",
       "name": "受注データ",
       "csv_file_path": "D:\\APP\\order.csv",
-      "read_encoding": "utf-8-sig",
-      "write_encoding": "utf-8-sig",
+      "read_encoding": "utf-8",
+      "write_encoding": "utf-8",
       "newline": "\r\n",
       "editable_columns": ["備考", "担当者", "ステータス"],
       "create_backup": true
