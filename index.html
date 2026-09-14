@@ -735,8 +735,8 @@ function buildFileList(files) {
     var card = document.createElement("div");
     card.className = "file-card";
 
-    var rEnc = conf.read_encoding  || "utf-8-sig";
-    var wEnc = conf.write_encoding || "utf-8-sig";
+    var rEnc = conf.read_encoding  || "utf-8";
+    var wEnc = conf.write_encoding || "utf-8";
     var nl   = conf.newline === "\n" ? "LF" : (conf.newline === "\r" ? "CR" : "CRLF");
 
     card.innerHTML =

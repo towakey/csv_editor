@@ -22,8 +22,8 @@ LOG_PATH     = os.path.join(SCRIPT_DIR, "log.csv")
 
 ENCODING_MAP = {
     "utf-8":       "utf-8",
-    "utf-8-sig":   "utf-8-sig",
-    "utf-8-bom":   "utf-8-sig",
+    "utf-8-sig":   "utf-8",
+    "utf-8-bom":   "utf-8",
     "shift-jis":   "shift_jis",
     "shift_jis":   "shift_jis",
     "sjis":        "shift_jis",
@@ -59,7 +59,7 @@ def write_log(username, action, detail=""):
     timestamp   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     file_exists = os.path.exists(LOG_PATH)
     try:
-        with open(LOG_PATH, mode="a", encoding="utf-8-sig", newline="") as f:
+        with open(LOG_PATH, mode="a", encoding="utf-8", newline="") as f:
             writer = csv.writer(f, lineterminator="\r\n")
             if not file_exists:
                 writer.writerow(["日時", "ユーザー名", "操作", "詳細"])
@@ -146,7 +146,7 @@ def write_history(conf, username, old_headers, old_rows, new_headers, new_rows):
 
     path = history_file_path(conf)
     file_exists = os.path.exists(path)
-    with open(path, mode="a", encoding="utf-8-sig", newline="") as history_file:
+    with open(path, mode="a", encoding="utf-8", newline="") as history_file:
         writer = csv.writer(history_file, lineterminator="\r\n")
         if not file_exists:
             writer.writerow([
