@@ -12,6 +12,8 @@ import sys
 from urllib.parse import parse_qs
 from datetime import datetime
 
+from auth_common import validate_auth_token
+
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 SETTING_PATH = os.path.join(SCRIPT_DIR, "setting.json")
 LOG_PATH     = os.path.join(SCRIPT_DIR, "log.csv")
@@ -79,6 +81,7 @@ def main():
     parsed = parse_qs(qs, keep_blank_values=True)
     file_id = parsed.get("file_id", [""])[0]
     username = parsed.get("username", [""])[0]
+    auth_token = os.environ.get("HTTP_X_AUTH_TOKEN", "")
     offset = parse_int(parsed.get("offset", ["0"])[0], 0)
     limit = parse_int(parsed.get("limit", ["1000"])[0], 1000)
 
@@ -92,9 +95,9 @@ def main():
         return
 
     # ユーザーの許可チェック
-    matched_user = next((u for u in users if u.get("username") == username), None)
+    matched_user = validate_auth_token(users, username, auth_token)
     if matched_user is None:
-        send_json({"success": False, "error": "ユーザーが存在しません"})
+        send_json({"success": False, "error": "認証の有効期限が切れました。再ログインしてください"})
         return
 
     allowed_ids = set(matched_user.get("allowed_file_ids", []))

@@ -11,6 +11,8 @@ import sys
 import csv
 from datetime import datetime
 
+from auth_common import create_auth_token, is_admin_user
+
 # cgitb は使用しない（HTMLエラーがJSONレスポンスに混入するため）
 
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
@@ -120,6 +122,8 @@ def main():
         "success":       True,
         "username":      username,
         "display_name":  matched_user.get("display_name", username),
+        "is_admin":      is_admin_user(matched_user),
+        "auth_token":    create_auth_token(matched_user),
         "allowed_files": allowed_files,
     })
 
