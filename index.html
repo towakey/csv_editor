@@ -318,6 +318,106 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ═══════════════════════════════════════
+       作業履歴
+    ═══════════════════════════════════════ */
+    #history-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      padding: 68px 20px 20px;
+      background: rgba(15,23,42,.48);
+    }
+    #history-modal.show { display: flex; }
+    .history-panel {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      background: var(--surface);
+      border-radius: 12px;
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+    }
+    .history-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .history-header h2 { font-size: 16px; }
+    .history-header .spacer { flex: 1; }
+    #history-file-filter {
+      min-width: 180px;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: #fff;
+      font-family: inherit;
+      font-size: 13px;
+    }
+    #history-list {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 16px;
+      background: var(--bg);
+    }
+    .history-message {
+      padding: 40px 16px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    .history-message.error { color: var(--danger); }
+    .history-group {
+      margin-bottom: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .history-group-title {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      padding: 10px 12px;
+      background: #eff6ff;
+      border-bottom: 1px solid #bfdbfe;
+      font-size: 12px;
+    }
+    .history-group-title strong { font-size: 13px; }
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .history-table th,
+    .history-table td {
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .history-table tr:last-child td { border-bottom: none; }
+    .history-table th {
+      color: var(--text-muted);
+      background: #f8fafc;
+      white-space: nowrap;
+    }
+    .history-value {
+      min-width: 150px;
+      max-width: 340px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .history-empty { color: #94a3b8; }
+
     /* Handsontable */
     .htDimmed { color: #94a3b8 !important; background: #f8fafc !important; }
     td.editable-col { background: #fefce8 !important; }
@@ -357,6 +457,7 @@
   </div>
   <div class="spacer"></div>
   <span id="status-bar"></span>
+  <button class="btn btn-outline" id="btn-history" onclick="openHistory()" style="display:none;padding:5px 12px;font-size:12px;">作業履歴</button>
   <button class="btn btn-ghost" onclick="doLogout()" style="padding:5px 12px;font-size:12px;">ログアウト</button>
 </header>
 
@@ -393,6 +494,22 @@
   </div>
 
 </main>
+
+<!-- ═══ admin専用 作業履歴 ═══ -->
+<div id="history-modal" role="dialog" aria-modal="true" aria-labelledby="history-title">
+  <section class="history-panel">
+    <div class="history-header">
+      <h2 id="history-title">作業履歴</h2>
+      <select id="history-file-filter" onchange="loadHistory()">
+        <option value="">すべてのファイル</option>
+      </select>
+      <button class="btn btn-outline" onclick="loadHistory()">再読み込み</button>
+      <div class="spacer"></div>
+      <button class="btn btn-ghost" onclick="closeHistory()">閉じる</button>
+    </div>
+    <div id="history-list"></div>
+  </section>
+</div>
 
 <script src="handsontable-6.2.2/dist/handsontable.full.min.js"></script>
 <script>
@@ -479,6 +596,7 @@ Handsontable.languages.registerLanguageDictionary({
 var AUTH_URL     = "auth.py";
 var READ_CSV_URL = "read_csv.py";
 var SAVE_CSV_URL = "save_csv.py";
+var HISTORY_URL  = "read_history.py";
 
 /* =================================================================
    アプリ状態
@@ -554,6 +672,7 @@ function doLogin() {
       document.getElementById("input-password").value = "";
       document.getElementById("login-screen").style.display = "none";
       document.getElementById("header-display-name").textContent = data.display_name;
+      document.getElementById("btn-history").style.display = data.is_admin ? "" : "none";
       document.getElementById("app-header").classList.add("show");
       document.getElementById("main").classList.add("show");
       buildFileList(data.allowed_files || []);
@@ -580,6 +699,8 @@ function doLogout() {
   activeFilters = {}; filterMap = null;
 
   document.getElementById("btn-clear-filter").style.display = "none";
+  document.getElementById("btn-history").style.display = "none";
+  closeHistory();
   document.getElementById("filter-info").classList.remove("show");
   document.getElementById("table-toolbar").classList.remove("visible");
   document.getElementById("table-wrapper").classList.remove("visible");
@@ -676,7 +797,10 @@ function loadCSV(fileId) {
 
     return fetch(url, {
       method: "GET",
-      headers: { "Cache-Control": "no-cache" }
+      headers: {
+        "Cache-Control": "no-cache",
+        "X-Auth-Token": currentUser.auth_token
+      }
     })
       .then(function (res) {
         if (!res.ok) throw new Error("HTTPエラー: " + res.status);
@@ -1035,7 +1159,10 @@ function saveCSV() {
 
   fetch(SAVE_CSV_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json; charset=utf-8" },
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "X-Auth-Token": currentUser.auth_token
+    },
     body: JSON.stringify({
       file_id:  currentFileId,
       username: currentUser.username,
@@ -1059,6 +1186,111 @@ function saveCSV() {
       hideLoading();
       setStatus("保存失敗: " + err.message, "error");
     });
+}
+
+/* =================================================================
+   admin専用 作業履歴
+   ================================================================= */
+function openHistory() {
+  if (!currentUser || !currentUser.is_admin) return;
+
+  var filter = document.getElementById("history-file-filter");
+  filter.innerHTML = '<option value="">すべてのファイル</option>';
+  (currentUser.allowed_files || []).forEach(function (file) {
+    var option = document.createElement("option");
+    option.value = file.id;
+    option.textContent = file.name || file.id;
+    filter.appendChild(option);
+  });
+
+  document.getElementById("history-modal").classList.add("show");
+  loadHistory();
+}
+
+function closeHistory() {
+  document.getElementById("history-modal").classList.remove("show");
+}
+
+function loadHistory() {
+  if (!currentUser || !currentUser.is_admin) return;
+
+  var list = document.getElementById("history-list");
+  var fileId = document.getElementById("history-file-filter").value;
+  var url = HISTORY_URL +
+    "?username=" + encodeURIComponent(currentUser.username) +
+    (fileId ? "&file_id=" + encodeURIComponent(fileId) : "");
+
+  list.innerHTML = '<div class="history-message">作業履歴を読み込み中...</div>';
+  fetch(url, {
+    method: "GET",
+    headers: {
+      "Cache-Control": "no-cache",
+      "X-Auth-Token": currentUser.auth_token
+    }
+  })
+    .then(function (res) {
+      if (!res.ok) throw new Error("HTTPエラー: " + res.status);
+      return res.json();
+    })
+    .then(function (data) {
+      if (!data.success) throw new Error(data.error || "履歴読み込みエラー");
+      renderHistory(data.entries || []);
+    })
+    .catch(function (err) {
+      list.innerHTML =
+        '<div class="history-message error">履歴の読み込みに失敗しました: ' +
+        escHtml(err.message) + '</div>';
+    });
+}
+
+function renderHistory(entries) {
+  var list = document.getElementById("history-list");
+  if (!entries.length) {
+    list.innerHTML = '<div class="history-message">保存された作業履歴はありません</div>';
+    return;
+  }
+
+  var groups = [];
+  var byId = {};
+  entries.forEach(function (entry) {
+    if (!byId[entry.save_id]) {
+      byId[entry.save_id] = [];
+      groups.push(byId[entry.save_id]);
+    }
+    byId[entry.save_id].push(entry);
+  });
+
+  list.innerHTML = groups.map(function (group) {
+    var first = group[0];
+    var rows = group.map(function (entry) {
+      var rowNumber = entry.row_number ? escHtml(entry.row_number) + " 行目" : "—";
+      return '<tr>' +
+        '<td>' + escHtml(entry.action) + '</td>' +
+        '<td>' + rowNumber + '</td>' +
+        '<td>' + (entry.column_name ? escHtml(entry.column_name) : "—") + '</td>' +
+        '<td class="history-value">' + historyValue(entry.before) + '</td>' +
+        '<td class="history-value">' + historyValue(entry.after) + '</td>' +
+      '</tr>';
+    }).join("");
+
+    return '<article class="history-group">' +
+      '<div class="history-group-title">' +
+        '<strong>' + escHtml(first.changed_at) + '</strong>' +
+        '<span>ファイル: ' + escHtml(first.file_name || first.file_id) + '</span>' +
+        '<span>ユーザー: ' + escHtml(first.username) + '</span>' +
+        '<span>変更: ' + group.length + ' 件</span>' +
+      '</div>' +
+      '<table class="history-table">' +
+        '<thead><tr><th>種別</th><th>行</th><th>列</th><th>変更前</th><th>変更後</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table>' +
+    '</article>';
+  }).join("");
+}
+
+function historyValue(value) {
+  if (value === "") return '<span class="history-empty">（空欄）</span>';
+  return escHtml(value);
 }
 
 /* =================================================================
