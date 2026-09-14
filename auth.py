@@ -12,21 +12,13 @@ import csv
 from datetime import datetime
 
 from auth_common import create_auth_token, is_admin_user
+from cgi_response import send_json
 
 # cgitb は使用しない（HTMLエラーがJSONレスポンスに混入するため）
 
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 SETTING_PATH = os.path.join(SCRIPT_DIR, "setting.json")
 LOG_PATH     = os.path.join(SCRIPT_DIR, "log.csv")
-
-def send_json(obj):
-    """HTTPヘッダー付きでJSONを出力して終了"""
-    body = json.dumps(obj, ensure_ascii=False)
-    sys.stdout.write("Content-Type: application/json; charset=utf-8\r\n")
-    sys.stdout.write("Access-Control-Allow-Origin: *\r\n")
-    sys.stdout.write("\r\n")
-    sys.stdout.write(body)
-    sys.stdout.flush()
 
 def write_log(username, action, detail=""):
     timestamp   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

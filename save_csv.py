@@ -15,6 +15,7 @@ from difflib import SequenceMatcher
 from datetime import datetime
 
 from auth_common import validate_auth_token
+from cgi_response import send_json
 
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 SETTING_PATH = os.path.join(SCRIPT_DIR, "setting.json")
@@ -37,17 +38,6 @@ NEWLINE_MAP = {
     "crlf": "\r\n", "lf": "\n", "cr": "\r",
     "\r\n": "\r\n", "\n": "\n", "\r": "\r",
 }
-
-def send_headers():
-    sys.stdout.write("Content-Type: application/json; charset=utf-8\r\n")
-    sys.stdout.write("Access-Control-Allow-Origin: *\r\n")
-    sys.stdout.write("\r\n")
-    sys.stdout.flush()
-
-def send_json(obj):
-    body = json.dumps(obj, ensure_ascii=False) + "\r\n"
-    sys.stdout.buffer.write(body.encode("utf-8"))
-    sys.stdout.flush()
 
 def normalize_encoding(enc):
     return ENCODING_MAP.get(enc.lower().replace(" ", ""), enc)
@@ -170,8 +160,6 @@ def write_history(conf, username, old_headers, old_rows, new_headers, new_rows):
     return len(changes), path
 
 def main():
-    send_headers()
-
     method = os.environ.get("REQUEST_METHOD", "GET").upper()
     if method == "OPTIONS":
         send_json({"success": True})
