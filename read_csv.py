@@ -8,11 +8,11 @@ GETパラメータ: ?file_id=order&username=admin
 import json
 import csv
 import os
-import sys
 from urllib.parse import parse_qs
 from datetime import datetime
 
 from auth_common import validate_auth_token
+from cgi_response import send_json
 
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 SETTING_PATH = os.path.join(SCRIPT_DIR, "setting.json")
@@ -30,18 +30,6 @@ ENCODING_MAP = {
     "euc-jp":      "euc_jp",
     "euc_jp":      "euc_jp",
 }
-
-def send_json(obj):
-    body = (json.dumps(obj, ensure_ascii=False) + "\r\n").encode("utf-8")
-    sys.stdout.write("Content-Type: application/json; charset=utf-8\r\n")
-    sys.stdout.write("Access-Control-Allow-Origin: *\r\n")
-    sys.stdout.write("Cache-Control: no-store\r\n")
-    sys.stdout.write("Content-Length: {}\r\n".format(len(body)))
-    sys.stdout.write("Connection: close\r\n")
-    sys.stdout.write("\r\n")
-    sys.stdout.flush()
-    sys.stdout.buffer.write(body)
-    sys.stdout.flush()
 
 def normalize_encoding(enc):
     return ENCODING_MAP.get(enc.lower().replace(" ", ""), enc)
