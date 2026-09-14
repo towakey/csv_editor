@@ -13,6 +13,12 @@ def is_admin_user(user):
     return user.get("username") == "admin" or user.get("role") == "admin"
 
 
+def can_view_history(user):
+    if "can_view_history" in user:
+        return user["can_view_history"] is True
+    return is_admin_user(user)
+
+
 def create_auth_token(user):
     expires_at = int(time.time()) + TOKEN_LIFETIME_SECONDS
     payload = "{}|{}".format(user.get("username", ""), expires_at)

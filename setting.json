@@ -26,12 +26,14 @@
       "username": "admin",
       "display_name": "管理者",
       "password": "password123",
+      "can_view_history": true,
       "allowed_file_ids": ["order", "stock"]
     },
     {
       "username": "user1",
       "display_name": "ユーザー1",
       "password": "pass456",
+      "can_view_history": false,
       "allowed_file_ids": ["order"]
     }
   ]
