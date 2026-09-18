@@ -360,7 +360,8 @@
       font-family: inherit;
       font-size: 13px;
     }
-    #history-list {
+    #history-list,
+    #approval-list {
       flex: 1;
       min-height: 0;
       overflow: auto;
@@ -417,6 +418,42 @@
       overflow-wrap: anywhere;
     }
     .history-empty { color: #94a3b8; }
+    .approval-entry {
+      margin-bottom: 12px;
+      padding: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .approval-entry-header {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .approval-entry-header strong { color: var(--text); font-size: 13px; }
+    .approval-status {
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .approval-status.pending { background: #fef3c7; color: #92400e; }
+    .approval-status.approved { background: #dcfce7; color: #166534; }
+    .approval-status.rejected { background: #fee2e2; color: #991b1b; }
+    .approval-reason {
+      margin: 8px 0;
+      padding: 8px 10px;
+      color: #991b1b;
+      background: #fef2f2;
+      border-radius: 6px;
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
 
     /* Handsontable */
     .htDimmed { color: #94a3b8 !important; background: #f8fafc !important; }
@@ -457,6 +494,7 @@
   </div>
   <div class="spacer"></div>
   <span id="status-bar"></span>
+  <button class="btn btn-outline" id="btn-approvals" onclick="openApprovals()" style="display:none;padding:5px 12px;font-size:12px;">確認依頼状況</button>
   <button class="btn btn-outline" id="btn-history" onclick="openHistory()" style="display:none;padding:5px 12px;font-size:12px;">作業履歴</button>
   <button class="btn btn-ghost" onclick="doLogout()" style="padding:5px 12px;font-size:12px;">ログアウト</button>
 </header>
@@ -475,7 +513,7 @@
 
   <!-- ツールバー -->
   <div id="table-toolbar">
-    <button class="btn btn-success" onclick="saveCSV()">💾 保存する</button>
+    <button class="btn btn-success" onclick="requestApproval()">確認依頼</button>
     <button class="btn btn-primary" onclick="addRow()">➕ 行を追加</button>
     <div class="row-delete-group">
       <input type="number" id="delete-row-number" min="1" step="1" placeholder="行番号">
@@ -494,6 +532,19 @@
   </div>
 
 </main>
+
+<!-- ═══ 確認依頼状況 ═══ -->
+<div id="approval-modal" role="dialog" aria-modal="true" aria-labelledby="approval-title" style="display:none;position:fixed;inset:0;z-index:510;padding:68px 20px 20px;background:rgba(15,23,42,.48);">
+  <section class="history-panel">
+    <div class="history-header">
+      <h2 id="approval-title">確認依頼状況</h2>
+      <button class="btn btn-outline" onclick="loadApprovals()">再読み込み</button>
+      <div class="spacer"></div>
+      <button class="btn btn-ghost" onclick="closeApprovals()">閉じる</button>
+    </div>
+    <div id="approval-list"></div>
+  </section>
+</div>
 
 <!-- ═══ 作業履歴 ═══ -->
 <div id="history-modal" role="dialog" aria-modal="true" aria-labelledby="history-title">
@@ -595,7 +646,8 @@ Handsontable.languages.registerLanguageDictionary({
    ================================================================= */
 var AUTH_URL     = "auth.py";
 var READ_CSV_URL = "read_csv.py";
-var SAVE_CSV_URL = "save_csv.py";
+var REQUEST_APPROVAL_URL = "request_approval.py";
+var READ_APPROVALS_URL = "read_approvals.py";
 var HISTORY_URL  = "read_history.py";
 
 /* =================================================================
@@ -672,6 +724,7 @@ function doLogin() {
       document.getElementById("input-password").value = "";
       document.getElementById("login-screen").style.display = "none";
       document.getElementById("header-display-name").textContent = data.display_name;
+      document.getElementById("btn-approvals").style.display = "";
       document.getElementById("btn-history").style.display = data.can_view_history ? "" : "none";
       document.getElementById("app-header").classList.add("show");
       document.getElementById("main").classList.add("show");
@@ -699,7 +752,9 @@ function doLogout() {
   activeFilters = {}; filterMap = null;
 
   document.getElementById("btn-clear-filter").style.display = "none";
+  document.getElementById("btn-approvals").style.display = "none";
   document.getElementById("btn-history").style.display = "none";
+  closeApprovals();
   closeHistory();
   document.getElementById("filter-info").classList.remove("show");
   document.getElementById("table-toolbar").classList.remove("visible");
@@ -777,7 +832,7 @@ function onOpenSelected() {
 /* =================================================================
    CSV 読み込み
    ================================================================= */
-function loadCSV(fileId) {
+function loadCSV(fileId, draft) {
   showLoading("CSVを読み込み中...");
   setStatus("", "");
   var pageSize = 1000;
@@ -829,8 +884,8 @@ function loadCSV(fileId) {
   fetchPage()
     .then(function () {
       hideLoading();
-      csvHeaders = headers;
-      csvRows = allRows;
+      csvHeaders = draft ? (draft.headers || []) : headers;
+      csvRows = draft ? (draft.rows || []) : allRows;
       currentFileId = fileId;
       currentConfName = confName;
       currentEditableColumns = editCols;
@@ -843,7 +898,11 @@ function loadCSV(fileId) {
       });
 
       renderTable(currentConfName, currentEditableColumns);
-      setStatus(csvRows.length + " / " + totalRows + " 行読み込みました", "success");
+      if (draft) {
+        setStatus("却下された下書きを復元しました。修正後、再度確認依頼してください", "success");
+      } else {
+        setStatus(csvRows.length + " / " + totalRows + " 行読み込みました", "success");
+      }
     })
     .catch(function (err) {
       hideLoading();
@@ -1144,20 +1203,20 @@ function deleteRowByNumber() {
 }
 
 /* =================================================================
-   CSV 保存
+   確認依頼
    ================================================================= */
-function saveCSV() {
+function requestApproval() {
   if (!hotInstance) { setStatus("テーブルが読み込まれていません", "error"); return; }
-  if (!confirm("保存しますがよいですか？")) return;
+  if (!confirm("変更内容を承認者へ確認依頼しますか？")) return;
 
-  showLoading("保存中...");
+  showLoading("確認依頼を送信中...");
   setStatus("", "");
 
   var cleanRows = masterRows.map(function (row) {
     return row.map(function (c) { return (c == null) ? "" : String(c); });
   });
 
-  fetch(SAVE_CSV_URL, {
+  fetch(REQUEST_APPROVAL_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json; charset=utf-8",
@@ -1177,14 +1236,127 @@ function saveCSV() {
     .then(function (data) {
       hideLoading();
       if (data.success) {
-        setStatus("✓ " + data.message, "success");
+        setStatus(data.message, "success");
       } else {
-        setStatus("保存エラー: " + data.error, "error");
+        var prefix = data.draft_saved
+          ? "下書きは保存されましたが、確認依頼の送信に失敗しました: "
+          : "確認依頼エラー: ";
+        setStatus(prefix + data.error, "error");
       }
     })
     .catch(function (err) {
       hideLoading();
-      setStatus("保存失敗: " + err.message, "error");
+      setStatus("確認依頼失敗: " + err.message, "error");
+    });
+}
+
+/* =================================================================
+   確認依頼状況・下書き復元
+   ================================================================= */
+function openApprovals() {
+  if (!currentUser) return;
+  document.getElementById("approval-modal").style.display = "flex";
+  loadApprovals();
+}
+
+function closeApprovals() {
+  document.getElementById("approval-modal").style.display = "none";
+}
+
+function loadApprovals() {
+  if (!currentUser) return;
+  var list = document.getElementById("approval-list");
+  var url = READ_APPROVALS_URL +
+    "?username=" + encodeURIComponent(currentUser.username);
+  list.innerHTML = '<div class="history-message">確認依頼を読み込み中...</div>';
+  fetch(url, {
+    method: "GET",
+    headers: {
+      "Cache-Control": "no-cache",
+      "X-Auth-Token": currentUser.auth_token
+    }
+  })
+    .then(function (res) {
+      if (!res.ok) throw new Error("HTTPエラー: " + res.status);
+      return res.json();
+    })
+    .then(function (data) {
+      if (!data.success) throw new Error(data.error || "確認依頼読み込みエラー");
+      renderApprovals(data.entries || []);
+    })
+    .catch(function (err) {
+      list.innerHTML =
+        '<div class="history-message error">確認依頼の読み込みに失敗しました: ' +
+        escHtml(err.message) + '</div>';
+    });
+}
+
+function renderApprovals(entries) {
+  var list = document.getElementById("approval-list");
+  if (!entries.length) {
+    list.innerHTML = '<div class="history-message">確認依頼はありません</div>';
+    return;
+  }
+  var labels = { pending: "確認待ち", approved: "承認済み", rejected: "却下済み" };
+  list.innerHTML = entries.map(function (entry) {
+    var reason = entry.rejection_reason
+      ? '<div class="approval-reason">却下理由: ' + escHtml(entry.rejection_reason) + '</div>'
+      : "";
+    var notificationError = entry.notification_error
+      ? '<div class="approval-reason">メール通知エラー: ' +
+        escHtml(entry.notification_error) + '</div>'
+      : "";
+    var restore = entry.status === "rejected"
+      ? '<button class="btn btn-primary" data-request-id="' +
+        escHtml(entry.request_id) + '">下書きを復元</button>'
+      : "";
+    return '<article class="approval-entry">' +
+      '<div class="approval-entry-header">' +
+        '<strong>' + escHtml(entry.file_name || entry.file_id) + '</strong>' +
+        '<span class="approval-status ' + escHtml(entry.status) + '">' +
+          escHtml(labels[entry.status] || entry.status) + '</span>' +
+        '<span>依頼: ' + escHtml(entry.created_at) + '</span>' +
+        '<span>更新: ' + escHtml(entry.updated_at) + '</span>' +
+      '</div>' + reason + notificationError + restore +
+    '</article>';
+  }).join("");
+  list.querySelectorAll("[data-request-id]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      restoreApprovalDraft(button.getAttribute("data-request-id"));
+    });
+  });
+}
+
+function restoreApprovalDraft(requestId) {
+  if (!confirm("現在編集中の内容を破棄して、却下された下書きを復元しますか？")) return;
+  showLoading("下書きを読み込み中...");
+  var url = READ_APPROVALS_URL +
+    "?username=" + encodeURIComponent(currentUser.username) +
+    "&request_id=" + encodeURIComponent(requestId);
+  fetch(url, {
+    method: "GET",
+    headers: {
+      "Cache-Control": "no-cache",
+      "X-Auth-Token": currentUser.auth_token
+    }
+  })
+    .then(function (res) {
+      if (!res.ok) throw new Error("HTTPエラー: " + res.status);
+      return res.json();
+    })
+    .then(function (data) {
+      if (!data.success) throw new Error(data.error || "下書き読み込みエラー");
+      if (data.request.status !== "rejected") {
+        throw new Error("却下済みの下書きだけ復元できます");
+      }
+      closeApprovals();
+      hideLoading();
+      selectedFileId = data.request.file_id;
+      loadCSV(data.request.file_id, data.request);
+    })
+    .catch(function (err) {
+      hideLoading();
+      setStatus("下書き復元失敗: " + err.message, "error");
     });
 }
 

@@ -8,6 +8,7 @@
       "write_encoding": "utf-8",
       "newline": "\r\n",
       "editable_columns": ["備考", "担当者", "ステータス"],
+      "approver_usernames": ["admin"],
       "create_backup": true
     },
     {
@@ -18,6 +19,7 @@
       "write_encoding": "shift-jis",
       "newline": "\r\n",
       "editable_columns": ["数量", "備考"],
+      "approver_usernames": ["admin"],
       "create_backup": true
     }
   ],
@@ -26,6 +28,7 @@
       "username": "admin",
       "display_name": "管理者",
       "password": "password123",
+      "email": "admin@example.com",
       "can_view_history": true,
       "allowed_file_ids": ["order", "stock"]
     },
@@ -33,8 +36,23 @@
       "username": "user1",
       "display_name": "ユーザー1",
       "password": "pass456",
+      "email": "user1@example.com",
       "can_view_history": false,
       "allowed_file_ids": ["order"]
     }
-  ]
+  ],
+  "approval": {
+    "draft_directory": "approval_drafts",
+    "review_url": "https://csv-editor.example.com/approval_review.py",
+    "smtp": {
+      "host": "smtp.example.com",
+      "port": 587,
+      "starttls": true,
+      "use_ssl": false,
+      "username": "",
+      "password_env": "CSV_EDITOR_SMTP_PASSWORD",
+      "from_address": "csv-editor@example.com",
+      "timeout_seconds": 20
+    }
+  }
 }
